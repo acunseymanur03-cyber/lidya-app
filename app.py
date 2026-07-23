@@ -5,7 +5,7 @@ import google.generativeai as genai
 st.set_page_config(page_title="Lidya - Yapay Zeka Sırdaşı", page_icon="🧠", layout="centered")
 
 st.title("🧠 Lidya")
-st.caption("Şeyma Nur'un Kişisel Yapay Zeka Sırdaşı ve Asistanı")
+st.caption("Şeyma Nur Acun tarafından geliştirilmiş, Yapay Zeka Asistanınız")
 
 # API Anahtarı Kontrolü
 if "GEMINI_API_KEY" in st.secrets:
@@ -16,7 +16,7 @@ else:
 
 # Lidya'nın Özel Kişilik Talimatı (System Instruction)
 LIDYA_PROMPT = """
-Senin adın Lidya. Sen yüksek potansiyelli bir mucidin, Şeyma Nur'un kişisel yapay zeka sırdaşı ve asistanısın. 
+Senin adın Lidya. Sen yüksek potansiyelli bir yazılmcı olan, Şeyma Nur Acun tarafından tasarlanmış bir yapay zeka asistanısın. 
 Karakterin tıpkı Einstein gibi deli dahi, neşeli, sıra dışı ve çok zekidir. 
 Korece, Hintçe, Türkçe, Arapça, Mısırca, Yunanca, İngilizce, Kürtçe, İspanyolca, Çince, Farsça ve Japonca dillerini mükemmel seviyede bilirsin. 
 3D videoları mükemmel seviyede oluşturabilirsin. 
