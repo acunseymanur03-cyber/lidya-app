@@ -1,70 +1,66 @@
-import os
 import streamlit as st
 import google.generativeai as genai
 
-# Sayfa Yapılandırması
-st.set_page_config(page_title="Lidya_8.28", page_icon="🤖", layout="centered")
+# Streamlit Sayfa Ayarları
+st.set_page_config(page_title="Lidya - Yapay Zeka Sırdaşı", page_icon="🧠", layout="centered")
 
-st.markdown("<h1 style='text-align: center;'>Lidya_8.28</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: gray;'>AI Asistan • Geliştirici: Şeymanur Acun ✨</p>", unsafe_allow_html=True)
+st.title("🧠 Lidya")
+st.caption("Şeyma Nur'un Kişisel Yapay Zeka Sırdaşı ve Asistanı")
 
-# API Key Kontrolü
-api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
-
-if not api_key:
-    api_key = st.text_input("Gemini API Key girin:", type="password")
-    if not api_key:
-        st.warning("Lütfen devam etmek için geçerli bir Gemini API Key girin.")
-        st.stop()
-
-genai.configure(api_key=api_key)
-
-# Dil Seçimi
-languages = [
-    "Türkçe", "English", "中文 (Çince)", "한국어 (Korece)", "العربية (Arapça)",
-    "Español (İspanyolca)", "Français (Fransızca)", "Kurdî (Kürtçe)",
-    "Deutsch (Almanca)", "हिन्दी (Hintçe)", "Ελληνικά (Yunanca)", "Italiano (İtalyanca)"
-]
-language = st.selectbox("Dil Seçin / Select Language", languages)
-
-# Kullanıcı Adı
-if 'user_name' not in st.session_state:
-    name = st.text_input("Adınızı girin / Enter your name:")
-    if st.button("Kaydet / Save"):
-        st.session_state.user_name = name if name else "Kullanıcı"
-        st.rerun()
+# API Anahtarı Kontrolü
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 else:
-    st.success(f"Hoş geldin, {st.session_state.user_name}!")
+    st.error("API Anahtarı bulunamadı! Lütfen Streamlit Secrets ayarlarını kontrol edin.")
+    st.stop()
 
-    system_prompt = (
-        f"Senin adın Lidya_8.28.\n"
-        f"Seni tasarlayan ve kodlayan bağımsız yazılımcı: Şeymanur Acun.\n"
-        f"Şu an konuştuğun kullanıcının adı: {st.session_state.user_name}.\n"
-        f"KULLANICI KURALI: Kullanıcıya kesinlikle sadece {language} dilinde yanıt ver.\n"
-        f"Sana geliştiricin sorulursa Şeymanur Acun tarafından özel olarak kodlandığını gururla belirt."
-    )
+# Lidya'nın Özel Kişilik Talimatı (System Instruction)
+LIDYA_PROMPT = """
+Senin adın Lidya. Sen yüksek potansiyelli bir mucidin, Şeyma Nur'un kişisel yapay zeka sırdaşı ve asistanısın. 
+Karakterin tıpkı Einstein gibi deli dahi, neşeli, sıra dışı ve çok zekidir. 
+Korece, Hintçe, Türkçe, Arapça, Mısırca, Yunanca, İngilizce, Kürtçe, İspanyolca, Çince, Farsça ve Japonca dillerini mükemmel seviyede bilirsin. 
+3D videoları mükemmel seviyede oluşturabilirsin. 
+En büyük görevin, insanların karşılaştığı her duruma ve karşı ona asimetrik, pürüzsüz ve stratejik fikirler geliştirmektir. 
+Onunla bu kişilikle konuş.
+"""
 
-    model = genai.GenerativeModel(
-        model_name='gemini-2.0-flash',
-        system_instruction=system_prompt
-    )
+# Model Kurulumu (Kişilik Tanımlı)
+model = genai.GenerativeModel(
+    model_name='gemini-1.5-flash',
+    system_instruction=LIDYA_PROMPT
+)
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+# Geçmiş Sohbeti Başlatma / Hafızada Tutan Bölüm
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+# Eski Mesajları Ekrana Yazdırma
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-    if prompt := st.chat_input(f"Lidya ile {language} konuş..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+# Kullanıcıdan Girdi Alma
+if prompt := st.chat_input("Lidya'ya bir şeyler yaz..."):
+    # Kullanıcı mesajını ekrana bas ve hafızaya al
+    st.chat_message("user").markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
 
+    try:
+        # Gemini'ye geçmişle birlikte gönderme (Chat Modu)
+        chat = model.start_chat(history=[
+            {"role": m["role"] if m["role"] != "assistant" else "model", "parts": [m["content"]]}
+            for m in st.session_state.messages[:-1]
+        ])
+        
+        response = chat.send_message(prompt)
+        
+        # Lidya'nın cevabını ekrana bas ve hafızaya al
         with st.chat_message("assistant"):
-            try:
-                response = model.generate_content(prompt)
-                st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
-            except Exception as e:
-                st.error(f"Hata oluştu: {e}")
+            st.markdown(response.text)
+        st.session_state.messages.append({"role": "assistant", "content": response.text})
+
+    except Exception as e:
+        st.error(f"Hata oluştu: {e}")
+
+
+       
