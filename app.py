@@ -1,5 +1,6 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # ==========================================
 # 1. SAYFA VE TASARIM AYARLARI (Mükemmel Arayüz)
@@ -113,16 +114,16 @@ else:
     st.markdown('<p class="lab-title">🧠 Lidya - Canlı Sohbet</p>', unsafe_allow_html=True)
     st.markdown(f'<p class="lab-intro">Hoş geldin <b>{st.session_state.user_name}</b>! Today is a perfect day to innovate. 🧪✨</p>', unsafe_allow_html=True)
 
-    # Gemini API Hazırlığı
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    
+    # 🔑 YENİ GEMINI CLIENT VE API ANAHTARI
+    # (Secrets kullanmak istersen: st.secrets["GEMINI_API_KEY"])
+    api_key = st.secrets.get("GEMINI_API_KEY")
+    client = genai.Client(api_key=api_key)
+
     system_prompt = f"""
     Senin adın Lidya. Enerjik, mucizeler ve yenilikler peşinde olan, bilim odaklı bir yapay zekasın.
     Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
     Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et.
     """
-    
-    model = genai.GenerativeModel(model_name="gemini-1.5-flash", system_instruction=system_prompt)
 
     # Aktif sohbet geçmişini al
     current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
@@ -141,16 +142,34 @@ else:
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # 2. Lidya'nın cevabını oluştur
+        # 2. Lidya'nın cevabını oluştur (YENİ KÜTÜPHANE MOTORU)
         with st.chat_message("assistant", avatar="🧠"):
-            # Geçmiş mesajları Gemini'ın anlayacağı formata çevir
-            formatted_history = []
+            # Geçmiş mesajları Gemini'ın anlayacağı yeni formata dönüştür
+            contents = []
             for m in current_messages[:-1]:
                 role = "user" if m["role"] == "user" else "model"
-                formatted_history.append({"role": role, "parts": [m["content"]]})
-            
-            chat_session = model.start_chat(history=formatted_history)
-            response = chat_session.send_message(prompt)
+                contents.append(
+                    types.Content(
+                        role=role,
+                        parts=[types.Part.from_text(text=m["content"])]
+                    )
+                )
+            # En son yazılan mesajı ekle
+            contents.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=prompt)]
+                )
+            )
+
+            # Modeli çağırıyoruz
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt
+                )
+            )
             
             st.markdown(response.text)
             # Cevabı kaydet
