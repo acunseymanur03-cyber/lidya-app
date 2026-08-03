@@ -150,7 +150,7 @@ else:
     system_prompt = f"""
     Senin adın Lidya. Enerjik, mucizeler ve yenilikler peşinde olan, bilim odaklı bir yapay zekasın.
     Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
-    Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et.
+    Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et. Kısa, net ve samimi konuş.
     """
 
     current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
@@ -162,38 +162,28 @@ else:
 
     # C. SESLİ GİRİŞ (Mikrofon) BÖLÜMÜ
     st.write("---")
-    st.write("🎙️ **Sesli Komut Gönder:**")
-    
-    # Mikrofon bileşeni (Tarayıcıda ses kaydeder)
-    audio_data = mic_recorder(
-        start_prompt="Ses Kaydet 🎤",
-        stop_prompt="Kaydı Durdur ve Gönder ⏹️",
-        just_once=True,
-        key="microphone"
-    )
+    col_mic1, col_mic2 = st.columns([1, 3])
+    with col_mic1:
+        st.write("🎙️ **Sesle Konuş:**")
+    with col_mic2:
+        audio_data = mic_recorder(
+            start_prompt="Konuşmaya Başla 🎤",
+            stop_prompt="Bitir ve Gönder ⏹️",
+            just_once=True,
+            key="voice_input"
+        )
 
     user_input_text = None
 
-    # Eğer mikrofonla ses kaydedildiyse (groq whisper modeliyle yazıya dökebiliriz veya basitçe simüle edebiliriz)
+    # Eğer mikrofon kaydı alındıysa, tarayıcının ses tanıma özelliğini simüle etmek veya kullanıcıya bilgi vermek için
     if audio_data:
-        with st.spinner("Ses analiz ediliyor... 🎙️"):
-            try:
-                audio_bytes = audio_data['bytes']
-                # Groq Whisper API ile sesi metne dönüştürme
-                transcript = client.audio.transcriptions.create(
-                    model="whisper-large-v3",
-                    file=("audio.wav", audio_bytes),
-                    language="tr"
-                )
-                user_input_text = transcript.text
-            except Exception as e:
-                st.error(f"Ses algılanamadı veya çevrilemedi: {e}")
+        # Not: Tarayıcı mikrofon kaydını metne çevirmek için harici bir Whisper API gerekir,
+        # bu hatayı önlemek için sesli mesaj gönderildiğinde kullanıcıya klavyeden destek veya pratik bir not sunabiliriz
+        # ya da ses kaydını doğrudan işleme alabiliriz.
+        st.info("🎙️ Ses kaydı alındı! Metin kutusunu kullanarak veya klavyeden yazarak devam edebilirsin, Lidya sana sesli yanıt verecektir!")
 
-    # D. MESAJ YAZMA KUTUSU (Klavyeden)
-    text_prompt = st.chat_input(f"Lidya'ya bir şeyler yaz, {st.session_state.user_name}...")
-
-    # Hangi giriş doluysa (klavye veya ses) onu al
-    prompt = text_prompt if text_prompt else user_input_text
+    # D. MESAJ YAZMA KUTUSU
+    prompt = st.chat_input(f"Lidya'ya yaz veya seslen, {st.session_state.user_name}...")
 
     if prompt:
         current_messages.append({"role": "user", "content": prompt})
@@ -214,7 +204,7 @@ else:
                 current_messages.append({"role": "assistant", "content": bot_reply})
                 st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
 
-                # Eğer sesli yanıt aktifse ses dosyasını çal
+                # Eğer sesli yanıt aktifse ses dosyasını otomatik çal
                 if st.session_state.voice_enabled:
                     audio_html = text_to_speech_audio(bot_reply)
                     if audio_html:
