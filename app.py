@@ -3,7 +3,6 @@ import streamlit as st
 from groq import Groq
 from gtts import gTTS
 import base64
-from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
 # 1. SAYFA VE TASARIM AYARLARI
@@ -45,29 +44,7 @@ st.markdown(
 )
 
 # ==========================================
-# 2. YARDIMCI FONKSİYONLAR (Ses Oynatma)
-# ==========================================
-def text_to_speech_audio(text, lang="tr"):
-    try:
-        tts = gTTS(text=text, lang=lang, slow=False)
-        audio_file = "temp_audio.mp3"
-        tts.save(audio_file)
-        with open(audio_file, "rb") as f:
-            data = f.read()
-        b64 = base64.b64encode(data).decode()
-        # Tarayıcının engellememesi için hem controls hem autoplay eklenmiş oynatıcı
-        audio_html = f'''
-            <audio controls autoplay style="width: 100%; margin-top: 10px;">
-                <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-                Tarayıcınız ses oynatmayı desteklemiyor.
-            </audio>
-        '''
-        return audio_html
-    except Exception:
-        return None
-
-# ==========================================
-# 3. HAFIZA VE DURUM YÖNETİMİ (Session State)
+# 2. HAFIZA VE DURUM YÖNETİMİ (Session State)
 # ==========================================
 if "user_name" not in st.session_state:
     st.session_state.user_name = None
@@ -78,11 +55,8 @@ if "all_chats" not in st.session_state:
 if "current_chat_id" not in st.session_state:
     st.session_state.current_chat_id = "Sohbet 1"
 
-if "voice_enabled" not in st.session_state:
-    st.session_state.voice_enabled = True
-
 # ==========================================
-# 4. İSİM ALMA EKRANI
+# 3. İSİM ALMA EKRANI
 # ==========================================
 if not st.session_state.user_name:
     st.markdown(
@@ -109,16 +83,13 @@ if not st.session_state.user_name:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# 5. SOHBET VE PANEL EKRANI
+# 4. SOHBET VE PANEL EKRANI
 # ==========================================
 else:
     # A. SOL YAN PANEL
     with st.sidebar:
         st.title("💬 Sohbet Paneli")
         st.write(f"👤 **Kullanıcı:** {st.session_state.user_name}")
-        st.write("---")
-
-        st.session_state.voice_enabled = st.toggle("🔊 Sesli Yanıtlar", value=st.session_state.voice_enabled)
         st.write("---")
 
         if st.button("➕ Yeni Sohbet", use_container_width=True):
@@ -161,10 +132,23 @@ else:
 
     current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
-    for msg in current_messages:
+    # Mesajları ve ses oynatıcılarını göster
+    for i, msg in enumerate(current_messages):
         avatar = "🧠" if msg["role"] == "assistant" else None
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
+            
+            # Eğer mesaj Lidya'dan geldiyse altına sesli dinleme butonu/oynatıcısı koyuyoruz
+            if msg["role"] == "assistant":
+                try:
+                    tts = gTTS(text=msg["content"], lang="tr", slow=False)
+                    audio_file = f"temp_audio_{i}.mp3"
+                    tts.save(audio_file)
+                    with open(audio_file, "rb") as f:
+                        audio_bytes = f.read()
+                    st.audio(audio_bytes, format="audio/mp3")
+                except Exception:
+                    pass
 
     # C. MESAJ YAZMA KUTUSU
     prompt = st.chat_input(f"Lidya'ya yaz veya klavye mikrofonuyla seslen, {st.session_state.user_name}...")
@@ -187,13 +171,6 @@ else:
 
                 current_messages.append({"role": "assistant", "content": bot_reply})
                 st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
-
-                # Eğer sesli yanıt aktifse ses dosyasını çal
-                if st.session_state.voice_enabled:
-                    audio_html = text_to_speech_audio(bot_reply)
-                    if audio_html:
-                        st.markdown(audio_html, unsafe_allow_html=True)
-
                 st.rerun()
 
         except Exception as e:
