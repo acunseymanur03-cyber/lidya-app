@@ -3,6 +3,7 @@ import streamlit as st
 from groq import Groq
 from gtts import gTTS
 import base64
+from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
 # 1. SAYFA VE TASARIM AYARLARI
@@ -132,13 +133,13 @@ else:
 
     current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
-    # Mesajları ve ses oynatıcılarını göster
+    # Geçmiş mesajları ekrana yazdır
     for i, msg in enumerate(current_messages):
         avatar = "🧠" if msg["role"] == "assistant" else None
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
             
-            # Eğer mesaj Lidya'dan geldiyse altına sesli dinleme butonu/oynatıcısı koyuyoruz
+            # Asistan mesajlarının altına ses oynatıcı ekle
             if msg["role"] == "assistant":
                 try:
                     tts = gTTS(text=msg["content"], lang="tr", slow=False)
@@ -150,8 +151,41 @@ else:
                 except Exception:
                     pass
 
-    # C. MESAJ YAZMA KUTUSU
-    prompt = st.chat_input(f"Lidya'ya yaz veya klavye mikrofonuyla seslen, {st.session_state.user_name}...")
+    # C. SESLİ GİRİŞ (Mikrofon Düğmesi)
+    st.write("---")
+    st.markdown("### 🎙️ Sesli Komut Ver")
+    
+    # Mikrofon kaydedici bileşeni
+    audio_data = mic_recorder(
+        start_prompt="Konuşmaya Başla 🎤",
+        stop_prompt="Kaydı Bitir ve Gönder ⏹️",
+        just_once=True,
+        key="voice_input"
+    )
+
+    spoken_prompt = None
+
+    # Eğer kullanıcı ses kaydettiyse
+    if audio_data:
+        audio_bytes = audio_data.get('bytes')
+        if audio_bytes:
+            with st.spinner("Lidya sesini dinliyor ve çözüyor... 🎙️"):
+                try:
+                    # Groq Whisper API ile sesi metne çevirme
+                    transcript = client.audio.transcriptions.create(
+                        model="whisper-large-v3",
+                        file=("audio.wav", audio_bytes),
+                        language="tr"
+                    )
+                    spoken_prompt = transcript.text
+                except Exception as e:
+                    st.error(f"Ses çözülemedi: {e}")
+
+    # D. DÜZ METİN GİRİŞİ (Yedek)
+    text_prompt = st.chat_input(f"Veya buraya yaz, {st.session_state.user_name}...")
+
+    # Hangisi doluysa onu ana girdi kabul et
+    prompt = spoken_prompt if spoken_prompt else text_prompt
 
     if prompt:
         current_messages.append({"role": "user", "content": prompt})
