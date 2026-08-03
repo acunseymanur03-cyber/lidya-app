@@ -55,7 +55,13 @@ def text_to_speech_audio(text, lang="tr"):
         with open(audio_file, "rb") as f:
             data = f.read()
         b64 = base64.b64encode(data).decode()
-        audio_html = f'<audio autoplay controls src="data:audio/mp3;base64,{b64}"></audio>'
+        # Tarayıcının engellememesi için hem controls hem autoplay eklenmiş oynatıcı
+        audio_html = f'''
+            <audio controls autoplay style="width: 100%; margin-top: 10px;">
+                <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+                Tarayıcınız ses oynatmayı desteklemiyor.
+            </audio>
+        '''
         return audio_html
     except Exception:
         return None
@@ -160,30 +166,8 @@ else:
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
 
-    # C. SESLİ GİRİŞ (Mikrofon) BÖLÜMÜ
-    st.write("---")
-    col_mic1, col_mic2 = st.columns([1, 3])
-    with col_mic1:
-        st.write("🎙️ **Sesle Konuş:**")
-    with col_mic2:
-        audio_data = mic_recorder(
-            start_prompt="Konuşmaya Başla 🎤",
-            stop_prompt="Bitir ve Gönder ⏹️",
-            just_once=True,
-            key="voice_input"
-        )
-
-    user_input_text = None
-
-    # Eğer mikrofon kaydı alındıysa, tarayıcının ses tanıma özelliğini simüle etmek veya kullanıcıya bilgi vermek için
-    if audio_data:
-        # Not: Tarayıcı mikrofon kaydını metne çevirmek için harici bir Whisper API gerekir,
-        # bu hatayı önlemek için sesli mesaj gönderildiğinde kullanıcıya klavyeden destek veya pratik bir not sunabiliriz
-        # ya da ses kaydını doğrudan işleme alabiliriz.
-        st.info("🎙️ Ses kaydı alındı! Metin kutusunu kullanarak veya klavyeden yazarak devam edebilirsin, Lidya sana sesli yanıt verecektir!")
-
-    # D. MESAJ YAZMA KUTUSU
-    prompt = st.chat_input(f"Lidya'ya yaz veya seslen, {st.session_state.user_name}...")
+    # C. MESAJ YAZMA KUTUSU
+    prompt = st.chat_input(f"Lidya'ya yaz veya klavye mikrofonuyla seslen, {st.session_state.user_name}...")
 
     if prompt:
         current_messages.append({"role": "user", "content": prompt})
@@ -204,7 +188,7 @@ else:
                 current_messages.append({"role": "assistant", "content": bot_reply})
                 st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
 
-                # Eğer sesli yanıt aktifse ses dosyasını otomatik çal
+                # Eğer sesli yanıt aktifse ses dosyasını çal
                 if st.session_state.voice_enabled:
                     audio_html = text_to_speech_audio(bot_reply)
                     if audio_html:
