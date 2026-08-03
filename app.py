@@ -1,6 +1,6 @@
+import os
 import streamlit as st
-from google import genai
-from google.genai import types
+from groq import Groq
 
 # ==========================================
 # 1. SAYFA VE TASARIM AYARLARI
@@ -114,12 +114,13 @@ else:
         unsafe_allow_html=True,
     )
 
-    api_key = st.secrets.get("GEMINI_API_KEY")
+    # Groq API Anahtarı Kontrolü
+    api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
     if not api_key:
-        st.error("⚠️ GEMINI_API_KEY anahtarı Streamlit Secrets içinde bulunamadı!")
+        st.error("⚠️ GROQ_API_KEY anahtarı bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
         st.stop()
 
-    client = genai.Client(api_key=api_key)
+    client = Groq(api_key=api_key)
 
     system_prompt = f"""
     Senin adın Lidya. Enerjik, mucizeler ve yenilikler peşinde olan, bilim odaklı bir yapay zekasın.
@@ -136,31 +137,24 @@ else:
 
     # C. MESAJ YAZMA KUTUSU
     if prompt := st.chat_input(f"Lidya'ya bir şeyler yaz, {st.session_state.user_name}..."):
-        # 1. Kullanıcı mesajını ekle
         current_messages.append({"role": "user", "content": prompt})
 
-        # 2. Geçmişi temiz Gemini formatına dönüştür
-        formatted_contents = []
+        formatted_messages = [{"role": "system", "content": system_prompt}]
         for m in current_messages:
-            role = "user" if m["role"] == "user" else "model"
-            formatted_contents.append({"role": role, "parts": [{"text": m["content"]}]})
+            formatted_messages.append({"role": m["role"], "content": m["content"]})
 
-        # 3. Modelden yanıt al
         try:
             with st.spinner("Lidya düşünüyor... 🧪"):
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=formatted_contents,
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_prompt
-                    ),
+                response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=formatted_messages,
                 )
                 
-                # Cevabı kaydet ve sayfayı tazele
-                current_messages.append({"role": "assistant", "content": response.text})
+                bot_reply = response.choices[0].message.content
+
+                current_messages.append({"role": "assistant", "content": bot_reply})
                 st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
                 st.rerun()
 
         except Exception as e:
             st.error(f"Bir hata oluştu: {e}")
-       
