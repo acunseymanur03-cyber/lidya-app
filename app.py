@@ -1,6 +1,9 @@
 import os
 import streamlit as st
 from groq import Groq
+from gtts import gTTS
+import base64
+from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
 # 1. SAYFA VE TASARIM AYARLARI
@@ -42,7 +45,23 @@ st.markdown(
 )
 
 # ==========================================
-# 2. HAFIZA VE DURUM YÖNETİMİ (Session State)
+# 2. YARDIMCI FONKSİYONLAR (Ses Oynatma)
+# ==========================================
+def text_to_speech_audio(text, lang="tr"):
+    try:
+        tts = gTTS(text=text, lang=lang, slow=False)
+        audio_file = "temp_audio.mp3"
+        tts.save(audio_file)
+        with open(audio_file, "rb") as f:
+            data = f.read()
+        b64 = base64.b64encode(data).decode()
+        audio_html = f'<audio autoplay controls src="data:audio/mp3;base64,{b64}"></audio>'
+        return audio_html
+    except Exception:
+        return None
+
+# ==========================================
+# 3. HAFIZA VE DURUM YÖNETİMİ (Session State)
 # ==========================================
 if "user_name" not in st.session_state:
     st.session_state.user_name = None
@@ -53,8 +72,11 @@ if "all_chats" not in st.session_state:
 if "current_chat_id" not in st.session_state:
     st.session_state.current_chat_id = "Sohbet 1"
 
+if "voice_enabled" not in st.session_state:
+    st.session_state.voice_enabled = True
+
 # ==========================================
-# 3. İSİM ALMA EKRANI
+# 4. İSİM ALMA EKRANI
 # ==========================================
 if not st.session_state.user_name:
     st.markdown(
@@ -81,13 +103,16 @@ if not st.session_state.user_name:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# 4. SOHBET VE PANEL EKRANI
+# 5. SOHBET VE PANEL EKRANI
 # ==========================================
 else:
     # A. SOL YAN PANEL
     with st.sidebar:
         st.title("💬 Sohbet Paneli")
         st.write(f"👤 **Kullanıcı:** {st.session_state.user_name}")
+        st.write("---")
+
+        st.session_state.voice_enabled = st.toggle("🔊 Sesli Yanıtlar", value=st.session_state.voice_enabled)
         st.write("---")
 
         if st.button("➕ Yeni Sohbet", use_container_width=True):
@@ -135,8 +160,42 @@ else:
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
 
-    # C. MESAJ YAZMA KUTUSU
-    if prompt := st.chat_input(f"Lidya'ya bir şeyler yaz, {st.session_state.user_name}..."):
+    # C. SESLİ GİRİŞ (Mikrofon) BÖLÜMÜ
+    st.write("---")
+    st.write("🎙️ **Sesli Komut Gönder:**")
+    
+    # Mikrofon bileşeni (Tarayıcıda ses kaydeder)
+    audio_data = mic_recorder(
+        start_prompt="Ses Kaydet 🎤",
+        stop_prompt="Kaydı Durdur ve Gönder ⏹️",
+        just_once=True,
+        key="microphone"
+    )
+
+    user_input_text = None
+
+    # Eğer mikrofonla ses kaydedildiyse (groq whisper modeliyle yazıya dökebiliriz veya basitçe simüle edebiliriz)
+    if audio_data:
+        with st.spinner("Ses analiz ediliyor... 🎙️"):
+            try:
+                audio_bytes = audio_data['bytes']
+                # Groq Whisper API ile sesi metne dönüştürme
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-large-v3",
+                    file=("audio.wav", audio_bytes),
+                    language="tr"
+                )
+                user_input_text = transcript.text
+            except Exception as e:
+                st.error(f"Ses algılanamadı veya çevrilemedi: {e}")
+
+    # D. MESAJ YAZMA KUTUSU (Klavyeden)
+    text_prompt = st.chat_input(f"Lidya'ya bir şeyler yaz, {st.session_state.user_name}...")
+
+    # Hangi giriş doluysa (klavye veya ses) onu al
+    prompt = text_prompt if text_prompt else user_input_text
+
+    if prompt:
         current_messages.append({"role": "user", "content": prompt})
 
         formatted_messages = [{"role": "system", "content": system_prompt}]
@@ -154,6 +213,13 @@ else:
 
                 current_messages.append({"role": "assistant", "content": bot_reply})
                 st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
+
+                # Eğer sesli yanıt aktifse ses dosyasını çal
+                if st.session_state.voice_enabled:
+                    audio_html = text_to_speech_audio(bot_reply)
+                    if audio_html:
+                        st.markdown(audio_html, unsafe_allow_html=True)
+
                 st.rerun()
 
         except Exception as e:
