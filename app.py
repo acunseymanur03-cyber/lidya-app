@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 from groq import Groq
-from gTTS import gTTS
+from gtts import gTTS
 import base64
 from streamlit_mic_recorder import mic_recorder
 
