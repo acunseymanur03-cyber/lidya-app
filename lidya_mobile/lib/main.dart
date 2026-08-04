@@ -125,7 +125,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = false;
 
   // BURAYA GROQ API ANAHTARINI YAPIŞTIRACAKSIN
-  final String _groqApiKey = "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";
+  final String _groqApiKey = ""YOUR_GROQ_API_KEY_HERE";
 
   Future<void> _sendMessage() async {
     String text = _messageController.text.trim();
