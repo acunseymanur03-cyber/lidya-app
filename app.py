@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 from groq import Groq
-from gtts import gTTS
+from gTTS import gTTS
 import base64
 from streamlit_mic_recorder import mic_recorder
 
@@ -97,6 +97,11 @@ else:
             new_id = f"Sohbet {len(st.session_state.all_chats) + 1}"
             st.session_state.all_chats[new_id] = []
             st.session_state.current_chat_id = new_id
+            st.rerun()
+
+        # 🔥 YENİ EKLENEN TEMİZLEME BUTONU
+        if st.button("🗑️ Sohbeti Temizle", use_container_width=True):
+            st.session_state.all_chats[st.session_state.current_chat_id] = []
             st.rerun()
 
         st.write("### 📜 Geçmiş Sohbetler")
