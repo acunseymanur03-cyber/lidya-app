@@ -1,2 +1,15 @@
-# lidya-app
-Lidya_8.28 is an AI assistant app built with Python and Streamlit, powered by the Google Gemini API. Developed by Şeymanur Acun as a final project for Harvard's CS50P course, it features multilingual support, custom persona identity, and real-time streaming chat.
+# 🚀 Lidya - AI-Powered Sentiment Analysis & Microservice Architecture
+
+Lidya, Doğal Dil İşleme (NLP) teknikleri kullanarak metinler üzerinde Duygu Analizi gerçekleştiren, FastAPI ve Streamlit tabanlı mikroservis uygulamasıdır.
+
+## 🛠️ Mimari ve Teknolojiler
+- **Backend:** FastAPI, Uvicorn, Pydantic
+- **Frontend:** Streamlit
+- **ML & NLP:** Scikit-learn, Pandas, CountVectorizer, Naive Bayes
+- **Database:** SQLite, SQLAlchemy ORM
+- **Containerization:** Docker, Docker Compose
+
+## 🚀 Hızlı Başlangıç
+
+- Streamlit: http://localhost:8501
+- FastAPI Docs: http://localhost:8000/docs

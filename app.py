@@ -214,3 +214,55 @@ else:
 
         except Exception as e:
             st.error(f"Bir hata oluştu: {e}")
+            import requests
+import streamlit as st
+
+# --- LIDYA DUYGU ANALIZI MODULU (FastAPI Entegrasyonu) ---
+st.divider()
+st.subheader("🤖 Lidya - Yapay Zeka Duygu Analizi")
+st.write("Girdiğiniz cümlenin pozitif mi yoksa negatif mi olduğunu kendi eğittiğimiz ML modeli tahmin etsin.")
+
+# Kullanıcıdan metin alma
+kullanici_metni = st.text_input("Analiz edilecek cümleyi girin:", "Bu uygulama gerçekten harika olmuş!")
+
+if st.button("Duyguyu Analiz Et"):
+    if kullanici_metni.strip() != "":
+        try:
+            # Arka plandaki FastAPI servisimize POST isteği atıyoruz
+            api_url = "http://127.0.0.1:8000/tahmin"
+            payload = {"metin": kullanici_metni}
+            
+            response = requests.post(api_url, json=payload)
+            
+            if response.status_code == 200:
+                sonuc = response.json()
+                tahmin = sonuc.get("duygu_tahmini")
+                
+                if tahmin == "POZITIF":
+                    st.success(f"**Tahmin:** {tahmin} 😊")
+                else:
+                    st.error(f"**Tahmin:** {tahmin} 🙁")
+            else:
+                st.warning("API sunucusundan beklenen yanıt alınamadı.")
+                
+        except Exception as e:
+            st.error("FastAPI sunucusuna bağlanılamadı. `uvicorn main:app --reload` komutunun çalıştığından emin olun!")
+    else:
+        st.info("Lütfen analiz için bir cümle yazın.")
+        # --- GEÇMİŞ ANALİZLER TABLOSU ---
+st.divider()
+st.subheader("📜 Veritabanı Analiz Geçmişi")
+
+if st.button("Geçmiş Analizleri Getir"):
+    try:
+        gecmis_res = requests.get("http://127.0.0.1:8000/gecmis")
+        if gecmis_res.status_code == 200:
+            veri = gecmis_res.json()
+            if veri:
+                st.dataframe(veri)
+            else:
+                st.info("Henüz veritabanında kayıtlı bir analiz bulunmuyor.")
+        else:
+            st.error("Geçmiş veriler alınamadı.")
+    except Exception:
+        st.error("FastAPI sunucusuna bağlanılamadı.")
