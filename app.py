@@ -4,7 +4,6 @@ import streamlit as st
 from groq import Groq
 from gtts import gTTS
 import base64
-from streamlit_mic_recorder import mic_recorder
 
 # ==========================================
 # 1. SAYFA VE TASARIM AYARLARI
@@ -100,7 +99,6 @@ else:
             st.session_state.current_chat_id = new_id
             st.rerun()
 
-        # 🔥 YENİ EKLENEN TEMİZLEME BUTONU
         if st.button("🗑️ Sohbeti Temizle", use_container_width=True):
             st.session_state.all_chats[st.session_state.current_chat_id] = []
             st.rerun()
@@ -157,41 +155,9 @@ else:
                 except Exception:
                     pass
 
-    # C. SESLİ GİRİŞ (Mikrofon Düğmesi)
+    # C. MESAJ GİRİŞİ
     st.write("---")
-    st.markdown("### 🎙️ Sesli Komut Ver")
-    
-    # Mikrofon kaydedici bileşeni
-    audio_data = mic_recorder(
-        start_prompt="Konuşmaya Başla 🎤",
-        stop_prompt="Kaydı Bitir ve Gönder ⏹️",
-        just_once=True,
-        key="voice_input"
-    )
-
-    spoken_prompt = None
-
-    # Eğer kullanıcı ses kaydettiyse
-    if audio_data:
-        audio_bytes = audio_data.get('bytes')
-        if audio_bytes:
-            with st.spinner("Lidya sesini dinliyor ve çözüyor... 🎙️"):
-                try:
-                    # Groq Whisper API ile sesi metne çevirme
-                    transcript = client.audio.transcriptions.create(
-                        model="whisper-large-v3",
-                        file=("audio.wav", audio_bytes),
-                        language="tr"
-                    )
-                    spoken_prompt = transcript.text
-                except Exception as e:
-                    st.error(f"Ses çözülemedi: {e}")
-
-    # D. DÜZ METİN GİRİŞİ (Yedek)
-    text_prompt = st.chat_input(f"Veya buraya yaz, {st.session_state.user_name}...")
-
-    # Hangisi doluysa onu ana girdi kabul et
-    prompt = spoken_prompt if spoken_prompt else text_prompt
+    prompt = st.chat_input(f"Mesajını buraya yaz, {st.session_state.user_name}...")
 
     if prompt:
         current_messages.append({"role": "user", "content": prompt})
@@ -215,8 +181,6 @@ else:
 
         except Exception as e:
             st.error(f"Bir hata oluştu: {e}")
-            import requests
-import streamlit as st
 
 # --- LIDYA DUYGU ANALIZI MODULU (FastAPI Entegrasyonu) ---
 st.divider()
