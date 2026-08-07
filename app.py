@@ -1,4 +1,5 @@
 import os
+import requests
 import streamlit as st
 from groq import Groq
 from gtts import gTTS
@@ -6,7 +7,7 @@ from gtts import gTTS
 # ==========================================
 # 1. SAYFA VE TASARIM AYARLARI
 # ==========================================
-st.set_page_config(page_title="🧠 Lidya - Canlı Sohbet", layout="wide", page_icon="🧪")
+st.set_page_config(page_title="🧠 Lidya - Akıllı Ev Asistanı", layout="wide", page_icon="🧪")
 
 st.markdown(
     """
@@ -63,7 +64,7 @@ if not st.session_state.user_name:
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<p class="lab-intro">Zihnim aktif, bugün hangi mucizevi ve asimetrik fikir üzerinde çalışıyoruz?</p>',
+        '<p class="lab-intro">Zihnim aktif, ev otomasyonu ve akıllı sistemler üzerinde çalışmaya hazır mıyız?</p>',
         unsafe_allow_html=True,
     )
 
@@ -82,10 +83,10 @@ if not st.session_state.user_name:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# 4. SOHBET VE PANEL EKRANI
+# 4. SOHBET VE AKILLI EV KONTROL PANELİ
 # ==========================================
 else:
-    # A. SOL YAN PANEL
+    # A. SOL YAN PANEL (Sohbetler ve Akıllı Ev Durumu)
     with st.sidebar:
         st.title("💬 Sohbet Paneli")
         st.write(f"👤 **Kullanıcı:** {st.session_state.user_name}")
@@ -108,14 +109,28 @@ else:
                 st.rerun()
 
         st.write("---")
+        st.write("### 🏠 Akıllı Ev Durumu")
+        # FastAPI'den ev durumunu çekip Sidebar'da gösterelim
+        try:
+            durum_res = requests.get("http://localhost:8000/durum", timeout=2)
+            if durum_res.status_code == 200:
+                cihazlar = durum_res.json()
+                for c_isim, c_bilgi in cihazlar.items():
+                    st.text(f"• {c_isim}: {c_bilgi['durum']}")
+            else:
+                st.text("API bağlantısı bekleniyor...")
+        except:
+            st.text("Akıllı Ev API kapalı (Yerel bağlantı)")
+
+        st.write("---")
         if st.button("🔑 İsmi Değiştir"):
             st.session_state.user_name = None
             st.rerun()
 
     # B. SAĞ ANA EKRAN
-    st.markdown('<p class="lab-title">🧠 Lidya - Canlı Sohbet</p>', unsafe_allow_html=True)
+    st.markdown('<p class="lab-title">🧠 Lidya - Akıllı Ev Asistanı</p>', unsafe_allow_html=True)
     st.markdown(
-        f'<p class="lab-intro">Hoş geldin <b>{st.session_state.user_name}</b>! Today is a perfect day to innovate. 🧪✨</p>',
+        f'<p class="lab-intro">Hoş geldin <b>{st.session_state.user_name}</b>! Evdeki cihazları yönetmek için buradayım. 🏠💡</p>',
         unsafe_allow_html=True,
     )
 
@@ -128,9 +143,10 @@ else:
     client = Groq(api_key=api_key)
 
     system_prompt = f"""
-    Senin adın Lidya. Enerjik, mucizeler ve yenilikler peşinde olan, bilim odaklı bir yapay zekasın.
+    Senin adın Lidya. Enerjik, akıllı ev sistemlerini yönetebilen bilim odaklı bir yapay zekasın.
     Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
     Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et. Kısa, net ve samimi konuş.
+    Eğer kullanıcı evdeki bir cihazı (salon lambası, klima, müzik çalar vb.) açmak veya kapatmak isterse, ona yardımcı olacağını belirt.
     """
 
     current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
@@ -165,7 +181,7 @@ else:
             formatted_messages.append({"role": m["role"], "content": m["content"]})
 
         try:
-            with st.spinner("Lidya düşünüyor... 🧪"):
+            with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
                 response = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=formatted_messages,
