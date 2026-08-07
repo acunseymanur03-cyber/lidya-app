@@ -1,5 +1,5 @@
 import os
-from langchain.text_splitter import CharacterTextSplitter
+from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.embeddings import FakeEmbeddings
 from langchain_community.vectorstores import Chroma
 

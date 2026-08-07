@@ -1,3 +1,4 @@
+import requests
 import os
 import streamlit as st
 from groq import Groq
@@ -222,16 +223,19 @@ st.divider()
 st.subheader("🤖 Lidya - Yapay Zeka Duygu Analizi")
 st.write("Girdiğiniz cümlenin pozitif mi yoksa negatif mi olduğunu kendi eğittiğimiz ML modeli tahmin etsin.")
 
-# Kullanıcıdan metin alma
-kullanici_metni = st.text_input("Analiz edilecek cümleyi girin:", "Bu uygulama gerçekten harika olmuş!")
+kullanici_metni = st.text_input("Analiz edilecek cümleyi girin:", "Bu uygulama gerçekten harika olmuş!", key="duygu_input")
 
-if st.button("Duyguyu Analiz Et"):
-    if kullanici_metni.strip() != "":
-        try:
-            # Arka plandaki FastAPI servisimize POST isteği atıyoruz
-            api_url = "http://127.0.0.1:8000/tahmin"
-            payload = {"metin": kullanici_metni}
+if st.button("Analiz Et"):
+    if kullanici_metni:
+        codespace_name = os.environ.get("CODESPACE_NAME")
+        if codespace_name:
+            api_url = f"https://{codespace_name}-8000.app.github.dev/tahmin"
+        else:
+            api_url = "http://localhost:8000/tahmin"
             
+        payload = {"metin": kullanici_metni}
+        
+        try:
             response = requests.post(api_url, json=payload)
             
             if response.status_code == 200:
@@ -243,19 +247,27 @@ if st.button("Duyguyu Analiz Et"):
                 else:
                     st.error(f"**Tahmin:** {tahmin} 🙁")
             else:
-                st.warning("API sunucusundan beklenen yanıt alınamadı.")
-                
+                st.warning(f"API sunucusundan beklenen yanıt alınamadı. (Kod: {response.status_code})")
+                st.code(response.text)
         except Exception as e:
-            st.error("FastAPI sunucusuna bağlanılamadı. `uvicorn main:app --reload` komutunun çalıştığından emin olun!")
+            st.error(f"Sunucuya bağlanırken hata oluştu: {e}")
     else:
         st.info("Lütfen analiz için bir cümle yazın.")
-        # --- GEÇMİŞ ANALİZLER TABLOSU ---
+
+# --- GEÇMİŞ ANALİZLER TABLOSU ---
 st.divider()
 st.subheader("📜 Veritabanı Analiz Geçmişi")
 
 if st.button("Geçmiş Analizleri Getir"):
     try:
-        gecmis_res = requests.get("http://127.0.0.1:8000/gecmis")
+        codespace_name = os.environ.get("CODESPACE_NAME")
+        if codespace_name:
+            gecmis_url = f"https://{codespace_name}-8000.app.github.dev/gecmis"
+        else:
+            gecmis_url = "http://127.0.0.1:8000/gecmis"
+            
+        gecmis_res = requests.get(gecmis_url)
+        
         if gecmis_res.status_code == 200:
             veri = gecmis_res.json()
             if veri:
@@ -263,6 +275,7 @@ if st.button("Geçmiş Analizleri Getir"):
             else:
                 st.info("Henüz veritabanında kayıtlı bir analiz bulunmuyor.")
         else:
-            st.error("Geçmiş veriler alınamadı.")
-    except Exception:
-        st.error("FastAPI sunucusuna bağlanılamadı.")
+            st.error("Geçmiş veriler sunucudan alınamadı.")
+            
+    except Exception as e:
+        st.error(f"FastAPI sunucusuna bağlanılamadı. Hata: {e}")

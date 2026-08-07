@@ -1,0 +1,6 @@
+#!/workspaces/lidya-app/.venv/bin/python3
+import sys
+from gtts.cli import tts_cli
+if __name__ == '__main__':
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    sys.exit(tts_cli())
