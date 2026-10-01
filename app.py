@@ -2,7 +2,13 @@ import os
 import sqlite3
 import streamlit as st
 from groq import Groq
-from gTTS import gTTS
+
+# gTTS kütüphanesini güvenli bir şekilde içe aktaralım (Uygulamanın çökmesini engeller)
+try:
+    from gTTS import gTTS
+    GTTS_AVAILABLE = True
+except ImportError:
+    GTTS_AVAILABLE = False
 
 # ==========================================
 # 0. VERİTABANI VE KALICI HAFIZA YÖNETİMİ
@@ -225,7 +231,7 @@ else:
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
             
-            if msg["role"] == "assistant":
+            if msg["role"] == "assistant" and GTTS_AVAILABLE:
                 try:
                     tts = gTTS(text=msg["content"], lang="tr" if st.session_state.selected_lang=="Türkçe" else "en", slow=False)
                     audio_file = f"temp_{i}.mp3"
@@ -245,9 +251,7 @@ else:
     # C. ÇOK MODLU GİRİŞ (METİN + FOTOĞRAF/İLLÜSTRASYON YÜKLEME)
     st.write("---")
     
-    # Kullanıcının fotoğraf yükleyebilmesi için genişletilmiş alan
     uploaded_image = st.file_uploader("📷 Tıbbi İllüstrasyon veya Fotoğraf Yükle (Görsel Analiz İçin)", type=["jpg", "jpeg", "png"])
-    
     prompt = st.chat_input(f"Laboratuvara bir komut veya araştırma sorusu yaz, {st.session_state.user_name}...")
 
     if prompt or uploaded_image:
