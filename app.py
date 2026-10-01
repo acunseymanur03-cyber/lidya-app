@@ -161,7 +161,7 @@ translations = {
         "module_title": "🔬 Medical Illustration & 3D",
         "module_info": "Module for adding custom anatomy sketches to research reports is active.",
         "change_id": "🔑 Change ID / Language",
-        "api_error": "⚠ GROQ_API_KEY key not found! Please add it to secrets.",
+        "api_error": "⚠️ GROQ_API_KEY key not found! Please add it to secrets.",
         "spinner": "Lidya is scanning global academic data... 🧪"
     },
     "Español": {
@@ -177,7 +177,7 @@ translations = {
         "module_title": "🔬 Ilustración Médica y 3D",
         "module_info": "Módulo activo para agregar bocetos de anatomía a informes.",
         "change_id": "🔑 Cambiar ID / Idioma",
-        "api_error": "⚠️ ¡No se encontró la clave GROQ_API_KEY!",
+        "api_error": "⚠️️ ¡No se encontró la clave GROQ_API_KEY!",
         "spinner": "Lidya está explorando datos académicos... 🧪"
     },
     "Deutsch": {
@@ -225,7 +225,7 @@ translations = {
         "module_title": "🔬 الرسوم الطبية والنمذجة ثلاثية الأبعاد",
         "module_info": "وحدة إضافة رسومات التشريح الخاصة بك إلى التقارير نشطة.",
         "change_id": "🔑 تغيير الهوية / اللغة",
-        "api_error": "⚠ لم يتم العثور على مفتاح GROQ_API_KEY!",
+        "api_error": "⚠️ لم يتم العثور على مفتاح GROQ_API_KEY!",
         "spinner": "ليديا تقوم بمسح البيانات الأكاديمية... 🧪"
     }
 }
@@ -388,7 +388,7 @@ else:
         try:
             with st.spinner(t["spinner"]):
                 response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
                     messages=formatted_messages,
                 )
                 bot_reply = response.choices[0].message.content
