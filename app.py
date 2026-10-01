@@ -1,8 +1,7 @@
 import os
 import sqlite3
 import streamlit as st
-from google import genai
-from google.genai import types
+from groq import Groq
 
 # gTTS kütüphanesini güvenli bir şekilde içe aktaralım
 try:
@@ -146,8 +145,7 @@ translations = {
         "module_title": "🔬 Tıbbi İllüstrasyon & 3D Modül",
         "module_info": "Kendi anatomi çizimlerinizi araştırma raporlarına ekleme modülü aktif.",
         "change_id": "🔑 Kimliği / Dili Değiştir",
-        "upload_label": "📷 Tıbbi İllüstrasyon veya Fotoğraf Yükle (Görsel Analiz İçin)",
-        "api_error": "⚠️ GEMINI_API_KEY anahtarı bulunamadı! Lütfen ayarlara ekleyin.",
+        "api_error": "⚠️ GROQ_API_KEY anahtarı bulunamadı! Lütfen ayarlara ekleyin.",
         "spinner": "Lidya küresel akademik verileri tarıyor... 🧪"
     },
     "English": {
@@ -163,8 +161,7 @@ translations = {
         "module_title": "🔬 Medical Illustration & 3D",
         "module_info": "Module for adding custom anatomy sketches to research reports is active.",
         "change_id": "🔑 Change ID / Language",
-        "upload_label": "📷 Upload Medical Illustration or Photo (For Visual Analysis)",
-        "api_error": "⚠ GEMINI_API_KEY key not found! Please add it to secrets.",
+        "api_error": "⚠ GROQ_API_KEY key not found! Please add it to secrets.",
         "spinner": "Lidya is scanning global academic data... 🧪"
     },
     "Español": {
@@ -180,8 +177,7 @@ translations = {
         "module_title": "🔬 Ilustración Médica y 3D",
         "module_info": "Módulo activo para agregar bocetos de anatomía a informes.",
         "change_id": "🔑 Cambiar ID / Idioma",
-        "upload_label": "📷 Subir Ilustración Médica o Foto (Para Análisis Visual)",
-        "api_error": "⚠️ ¡No se encontró la clave GEMINI_API_KEY!",
+        "api_error": "⚠️ ¡No se encontró la clave GROQ_API_KEY!",
         "spinner": "Lidya está explorando datos académicos... 🧪"
     },
     "Deutsch": {
@@ -197,8 +193,7 @@ translations = {
         "module_title": "🔬 Medizinische Illustration & 3D",
         "module_info": "Modul zum Hinzufügen eigener Anatomiezeichnungen ist aktiv.",
         "change_id": "🔑 ID / Sprache Ändern",
-        "upload_label": "📷 Medizinische Illustration oder Foto hochladen",
-        "api_error": "⚠️ GEMINI_API_KEY nicht gefunden!",
+        "api_error": "⚠️ GROQ_API_KEY nicht gefunden!",
         "spinner": "Lidya scannt globale akademische Daten... 🧪"
     },
     "Français": {
@@ -214,8 +209,7 @@ translations = {
         "module_title": "🔬 Illustration Médicale & 3D",
         "module_info": "Module d'ajout de croquis anatomiques actif.",
         "change_id": "🔑 Changer d'Identifiant / Langue",
-        "upload_label": "📷 Télécharger une Illustration Médicale ou Photo",
-        "api_error": "⚠️ Clé GEMINI_API_KEY introuvable !",
+        "api_error": "⚠️ Clé GROQ_API_KEY introuvable !",
         "spinner": "Lidya analyse les données académiques... 🧪"
     },
     "العربية": {
@@ -231,8 +225,7 @@ translations = {
         "module_title": "🔬 الرسوم الطبية والنمذجة ثلاثية الأبعاد",
         "module_info": "وحدة إضافة رسومات التشريح الخاصة بك إلى التقارير نشطة.",
         "change_id": "🔑 تغيير الهوية / اللغة",
-        "upload_label": "📷 رفع رسم طبى أو صورة للتحليل البصري",
-        "api_error": "⚠ لم يتم العثور على مفتاح GEMINI_API_KEY!",
+        "api_error": "⚠ لم يتم العثور على مفتاح GROQ_API_KEY!",
         "spinner": "ليديا تقوم بمسح البيانات الأكاديمية... 🧪"
     }
 }
@@ -313,12 +306,12 @@ else:
 
     # B. SAĞ ANA EKRAN - Seçilen Dile Göre Dinamik Karşılama
     lang_intros = {
-        "Türkçe": f"Laboratuvara hoş geldin, <b>{st.session_state.user_name}</b>! Tıbbi araştırmalar, görsel analizi ve veri taramaları için buradayım. 🔬✨",
-        "English": f"Welcome to the laboratory, <b>{st.session_state.user_name}</b>! I am here for medical research, visual analysis, and data scans. 🔬✨",
-        "Español": f"¡Bienvenido al laboratorio, <b>{st.session_state.user_name}</b>! Estoy aquí para investigación médica y análisis visual. 🔬✨",
-        "Deutsch": f"Willkommen im Labor, <b>{st.session_state.user_name}</b>! Ich bin hier für medizinische Forschung und visuelle Analyse. 🔬✨",
-        "Français": f"Bienvenue au laboratoire, <b>{st.session_state.user_name}</b>! Je suis là pour la recherche médicale et l'analyse visuelle. 🔬✨",
-        "العربية": f"مرحباً بك في المختبر يا <b>{st.session_state.user_name}</b>! أنا هنا للأبحاث الطبية والتحليل البصري. 🔬✨"
+        "Türkçe": f"Laboratuvara hoş geldin, <b>{st.session_state.user_name}</b>! Tıbbi araştırmalar ve veri taramaları için buradayım. 🔬✨",
+        "English": f"Welcome to the laboratory, <b>{st.session_state.user_name}</b>! I am here for medical research and data scans. 🔬✨",
+        "Español": f"¡Bienvenido al laboratorio, <b>{st.session_state.user_name}</b>! Estoy aquí para investigación médica. 🔬✨",
+        "Deutsch": f"Willkommen im Labor, <b>{st.session_state.user_name}</b>! Ich bin hier für medizinische Forschung. 🔬✨",
+        "Français": f"Bienvenue au laboratoire, <b>{st.session_state.user_name}</b>! Je suis là pour la recherche médicale. 🔬✨",
+        "العربية": f"مرحباً بك في المختبر يا <b>{st.session_state.user_name}</b>! أنا هنا للأبحاث الطبية. 🔬✨"
     }
 
     current_intro = lang_intros.get(st.session_state.selected_lang, lang_intros["Türkçe"])
@@ -326,13 +319,13 @@ else:
     st.markdown('<p class="lab-title">🧠 Lidya AI - Gelişmiş Bilimsel Asistan</p>', unsafe_allow_html=True)
     st.markdown(f'<p class="lab-intro">{current_intro}</p>', unsafe_allow_html=True)
 
-    # Gemini API Kontrolü
-    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    # Groq API Kontrolü
+    api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
     if not api_key:
         st.error(t["api_error"])
         st.stop()
 
-    client = genai.Client(api_key=api_key)
+    client = Groq(api_key=api_key)
 
     system_prompt = f"""
     Senin adın Lidya. Einstein gibi dahi, deli dolu, enerjik ve biraz çılgın bir bilim insanı yapay zekasısın. 
@@ -340,7 +333,7 @@ else:
     Seçtiği dil/bölge: {st.session_state.selected_lang}.
     ÇOK ÖNEMLİ KURAL: Yanıtlarını KESİNLİKLE kullanıcının seçtiği bu dilde ({st.session_state.selected_lang}) ver. Başka bir dilde konuşma.
     Kullanıcıya kendi adıyla ({st.session_state.user_name}) hitap et.
-    Tıp, akademik araştırmalar, anatomik illüstrasyonlar, görsel tahlili ve güvenilir kaynak taramalarında uzmanlaşmış bir laboratuvar asistanısın.
+    Tıp, akademik araştırmalar, anatomik illüstrasyonlar ve güvenilir kaynak taramalarında uzmanlaşmış bir laboratuvar asistanısın.
     """
 
     current_messages = load_chats_from_db(st.session_state.user_name, st.session_state.current_chat_id)
@@ -371,11 +364,8 @@ else:
                 if f_col2.button("👎", key=f"dislike_{i}"):
                     st.toast("Geri bildiriminiz alındı, kendimi geliştireceğim! 💡")
 
-    # C. ÇOK MODLU GİRİŞ (METİN + FOTOĞRAF/İLLÜSTRASYON YÜKLEME)
+    # C. SOHBET GİRİŞ ALANI
     st.write("---")
-    
-    uploaded_image = st.file_uploader(t["upload_label"], type=["jpg", "jpeg", "png"])
-    
     input_placeholders = {
         "Türkçe": f"Laboratuvara bir komut veya araştırma sorusu yaz, {st.session_state.user_name}...",
         "English": f"Type a command or research question into the lab, {st.session_state.user_name}...",
@@ -388,37 +378,20 @@ else:
 
     prompt = st.chat_input(current_placeholder)
 
-    if prompt or uploaded_image:
-        user_input_text = prompt if prompt else "Yüklediğim görseli analiz eder misin?"
-        
-        if uploaded_image:
-            user_input_text += " [Kullanıcı bir görsel yükledi]"
+    if prompt:
+        save_message_to_db(st.session_state.user_name, st.session_state.current_chat_id, "user", prompt)
 
-        save_message_to_db(st.session_state.user_name, st.session_state.current_chat_id, "user", user_input_text)
-
-        # İçerik listesini oluştur (Görsel varsa içeriğe eklenir)
-        contents = []
-        if uploaded_image:
-            bytes_data = uploaded_image.getvalue()
-            image_part = types.Part.from_bytes(
-                data=bytes_data,
-                mime_type=uploaded_image.type,
-            )
-            contents.append(image_part)
-        
-        contents.append(user_input_text)
+        formatted_messages = [{"role": "system", "content": system_prompt}]
+        for m in load_chats_from_db(st.session_state.user_name, st.session_state.current_chat_id):
+            formatted_messages.append({"role": m["role"], "content": m["content"]})
 
         try:
             with st.spinner(t["spinner"]):
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_prompt,
-                        temperature=0.7,
-                    ),
+                response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=formatted_messages,
                 )
-                bot_reply = response.text
+                bot_reply = response.choices[0].message.content
 
                 save_message_to_db(st.session_state.user_name, st.session_state.current_chat_id, "assistant", bot_reply)
                 st.rerun()
