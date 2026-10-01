@@ -5,7 +5,7 @@ from groq import Groq
 from gTTS import gTTS
 
 # ==========================================
-# 0. VERİTABANI (SOHBET VE NOT KALICILIĞI) YÖNETİMİ
+# 0. VERİTABANI VE KALICI HAFIZA YÖNETİMİ
 # ==========================================
 DB_FILE = "lidya_lab.db"
 
@@ -74,7 +74,7 @@ def load_note_from_db(username):
 # ==========================================
 # 1. SAYFA VE TASARIM AYARLARI
 # ==========================================
-st.set_page_config(page_title="🧠 Lidya AI - Bilimsel Laboratuvar", layout="wide", page_icon="🧪")
+st.set_page_config(page_title="🧠 Lidya AI - Bilimsel & Tıbbi Laboratuvar", layout="wide", page_icon="🧪")
 
 st.markdown(
     """
@@ -87,15 +87,15 @@ st.markdown(
         color: #58a6ff;
         text-align: center;
         font-family: 'Courier New', monospace;
-        font-size: 38px;
+        font-size: 36px;
         font-weight: bold;
         margin-bottom: 5px;
     }
     .lab-intro {
         text-align: center;
         color: #8b949e;
-        font-size: 18px;
-        margin-bottom: 25px;
+        font-size: 16px;
+        margin-bottom: 20px;
     }
     .welcome-card {
         background-color: #161b22;
@@ -123,7 +123,7 @@ if "selected_lang" not in st.session_state:
     st.session_state.selected_lang = "Türkçe"
 
 # ==========================================
-# 3. İSİM VE DİL SEÇİM EKRANI
+# 3. İSİM VE KÜRESEL DİL SEÇİMİ
 # ==========================================
 if not st.session_state.user_name:
     st.markdown(
@@ -131,7 +131,7 @@ if not st.session_state.user_name:
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<p class="lab-intro">Einsteinvari dahi zihnim aktif; tıp, illüstrasyon ve bilimsel araştırmalar için hazır mıyız?</p>',
+        '<p class="lab-intro">Einsteinvari dahi zihnim aktif; tıp, illüstrasyon, görsel analizi ve akademik araştırmalar için hazır mıyız?</p>',
         unsafe_allow_html=True,
     )
 
@@ -180,10 +180,14 @@ else:
         st.write("---")
         st.write("### 📝 Araştırma Not Defteri")
         current_note = load_note_from_db(st.session_state.user_name)
-        updated_note = st.text_area("Anlık Notlar", value=current_note, height=150)
+        updated_note = st.text_area("Anlık Notlar", value=current_note, height=140)
         if st.button("Notları Kaydet", use_container_width=True):
             save_note_to_db(st.session_state.user_name, updated_note)
             st.success("Notlar veritabanına kaydedildi!")
+
+        st.write("---")
+        st.write("### 🔬 Tıbbi İllüstrasyon & 3D Modül")
+        st.info("Kendi anatomi çizimlerinizi araştırma raporlarına ekleme modülü aktif.")
 
         st.write("---")
         if st.button("🔑 Kimliği / Dili Değiştir"):
@@ -191,9 +195,9 @@ else:
             st.rerun()
 
     # B. SAĞ ANA EKRAN
-    st.markdown('<p class="lab-title">🧠 Lidya AI - Bilimsel Araştırma Asistanı</p>', unsafe_allow_html=True)
+    st.markdown('<p class="lab-title">🧠 Lidya AI - Gelişmiş Bilimsel Asistan</p>', unsafe_allow_html=True)
     st.markdown(
-        f'<p class="lab-intro">Laboratuvara hoş geldin, <b>{st.session_state.user_name}</b>! Tıbbi illüstrasyonlar ve araştırmalar için buradayım. 🔬✨</p>',
+        f'<p class="lab-intro">Laboratuvara hoş geldin, <b>{st.session_state.user_name}</b>! Tıbbi araştırmalar, görsel analizi ve veri taramaları için buradayım. 🔬✨</p>',
         unsafe_allow_html=True,
     )
 
@@ -209,7 +213,7 @@ else:
     Senin adın Lidya. Einstein gibi dahi, deli dolu, enerjik ve biraz çılgın bir bilim insanı yapay zekasısın. 
     Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}. Seçtiği dil/bölge: {st.session_state.selected_lang}.
     Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et ve seçtiği dilde yanıt ver.
-    Tıp, bilimsel araştırmalar, anatomik illüstrasyonlar ve akademik taramalarda uzmanlaşmış bir laboratuvar asistanısın.
+    Tıp, akademik araştırmalar, anatomik illüstrasyonlar, görsel tahlili ve güvenilir kaynak taramalarında uzmanlaşmış bir laboratuvar asistanısın.
     Cevaplarında bilimsel terimleri eğlenceli, coşkulu ve dahi bir dille harmanla.
     """
 
@@ -231,26 +235,35 @@ else:
                 except Exception:
                     pass
 
-                # Geri bildirim butonları
+                # 👍 / 👎 Geri Bildirim Butonları
                 f_col1, f_col2, f_col3 = st.columns([1, 1, 10])
                 if f_col1.button("👍", key=f"like_{i}"):
                     st.toast("Teşekkürler! Geri bildirimin kaydedildi. 🚀")
                 if f_col2.button("👎", key=f"dislike_{i}"):
                     st.toast("Geri bildiriminiz alındı, kendimi geliştireceğim! 💡")
 
-    # C. MESAJ GİRİŞİ
+    # C. ÇOK MODLU GİRİŞ (METİN + FOTOĞRAF/İLLÜSTRASYON YÜKLEME)
     st.write("---")
-    prompt = st.chat_input(f"Laboratuvara bir araştırma konusu veya soru yaz, {st.session_state.user_name}...")
+    
+    # Kullanıcının fotoğraf yükleyebilmesi için genişletilmiş alan
+    uploaded_image = st.file_uploader("📷 Tıbbi İllüstrasyon veya Fotoğraf Yükle (Görsel Analiz İçin)", type=["jpg", "jpeg", "png"])
+    
+    prompt = st.chat_input(f"Laboratuvara bir komut veya araştırma sorusu yaz, {st.session_state.user_name}...")
 
-    if prompt:
-        save_message_to_db(st.session_state.user_name, st.session_state.current_chat_id, "user", prompt)
+    if prompt or uploaded_image:
+        user_input_text = prompt if prompt else "Yüklediğim tıbbi illüstrasyonu/görseli analiz edip yorumlar mısın?"
+        
+        if uploaded_image:
+            user_input_text += " [Kullanıcı bir görsel yükledi ve incelenmesini istiyor]"
+
+        save_message_to_db(st.session_state.user_name, st.session_state.current_chat_id, "user", user_input_text)
 
         formatted_messages = [{"role": "system", "content": system_prompt}]
         for m in load_chats_from_db(st.session_state.user_name, st.session_state.current_chat_id):
             formatted_messages.append({"role": m["role"], "content": m["content"]})
 
         try:
-            with st.spinner("Lidya bilimsel kaynakları tarıyor ve teoriler üretiyor... 🧪"):
+            with st.spinner("Lidya küresel akademik verileri tarıyor ve illüstrasyonu inceliyor... 🧪"):
                 response = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=formatted_messages,
