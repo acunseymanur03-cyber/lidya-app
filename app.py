@@ -3,7 +3,7 @@ import sqlite3
 import streamlit as st
 from groq import Groq
 
-# gTTS kütüphanesini güvenli bir şekilde içe aktaralım (Uygulamanın çökmesini engeller)
+# gTTS kütüphanesini güvenli bir şekilde içe aktaralım
 try:
     from gTTS import gTTS
     GTTS_AVAILABLE = True
@@ -200,12 +200,20 @@ else:
             st.session_state.user_name = None
             st.rerun()
 
-    # B. SAĞ ANA EKRAN
+    # B. SAĞ ANA EKRAN - Seçilen Dile Göre Dinamik Karşılama
+    lang_intros = {
+        "Türkçe": f"Laboratuvara hoş geldin, <b>{st.session_state.user_name}</b>! Tıbbi araştırmalar, görsel analizi ve veri taramaları için buradayım. 🔬✨",
+        "English": f"Welcome to the laboratory, <b>{st.session_state.user_name}</b>! I am here for medical research, visual analysis, and data scans. 🔬✨",
+        "Español": f"¡Bienvenido al laboratorio, <b>{st.session_state.user_name}</b>! Estoy aquí para investigación médica y análisis visual. 🔬✨",
+        "Deutsch": f"Willkommen im Labor, <b>{st.session_state.user_name}</b>! Ich bin hier für medizinische Forschung und visuelle Analyse. 🔬✨",
+        "Français": f"Bienvenue au laboratoire, <b>{st.session_state.user_name}</b>! Je suis là pour la recherche médicale et l'analyse visuelle. 🔬✨",
+        "العربية": f"مرحباً بك في المختبر يا <b>{st.session_state.user_name}</b>! أنا هنا للأبحاث الطبية والتحليل البصري. 🔬✨"
+    }
+
+    current_intro = lang_intros.get(st.session_state.selected_lang, lang_intros["Türkçe"])
+
     st.markdown('<p class="lab-title">🧠 Lidya AI - Gelişmiş Bilimsel Asistan</p>', unsafe_allow_html=True)
-    st.markdown(
-        f'<p class="lab-intro">Laboratuvara hoş geldin, <b>{st.session_state.user_name}</b>! Tıbbi araştırmalar, görsel analizi ve veri taramaları için buradayım. 🔬✨</p>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(f'<p class="lab-intro">{current_intro}</p>', unsafe_allow_html=True)
 
     # Groq API Kontrolü
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
@@ -217,10 +225,11 @@ else:
 
     system_prompt = f"""
     Senin adın Lidya. Einstein gibi dahi, deli dolu, enerjik ve biraz çılgın bir bilim insanı yapay zekasısın. 
-    Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}. Seçtiği dil/bölge: {st.session_state.selected_lang}.
-    Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et ve seçtiği dilde yanıt ver.
+    Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}. 
+    Seçtiği dil/bölge: {st.session_state.selected_lang}.
+    ÇOK ÖNEMLİ KURAL: Yanıtlarını KESİNLİKLE kullanıcının seçtiği bu dilde ({st.session_state.selected_lang}) ver. Başka bir dilde konuşma.
+    Kullanıcıya kendi adıyla ({st.session_state.user_name}) hitap et.
     Tıp, akademik araştırmalar, anatomik illüstrasyonlar, görsel tahlili ve güvenilir kaynak taramalarında uzmanlaşmış bir laboratuvar asistanısın.
-    Cevaplarında bilimsel terimleri eğlenceli, coşkulu ve dahi bir dille harmanla.
     """
 
     current_messages = load_chats_from_db(st.session_state.user_name, st.session_state.current_chat_id)
@@ -233,7 +242,11 @@ else:
             
             if msg["role"] == "assistant" and GTTS_AVAILABLE:
                 try:
-                    tts = gTTS(text=msg["content"], lang="tr" if st.session_state.selected_lang=="Türkçe" else "en", slow=False)
+                    # Dil kodunu gTTS için ayarla
+                    lang_code_map = {"Türkçe": "tr", "English": "en", "Español": "es", "Deutsch": "de", "Français": "fr", "العربية": "ar"}
+                    tts_lang = lang_code_map.get(st.session_state.selected_lang, "tr")
+                    
+                    tts = gTTS(text=msg["content"], lang=tts_lang, slow=False)
                     audio_file = f"temp_{i}.mp3"
                     tts.save(audio_file)
                     with open(audio_file, "rb") as f:
@@ -252,13 +265,24 @@ else:
     st.write("---")
     
     uploaded_image = st.file_uploader("📷 Tıbbi İllüstrasyon veya Fotoğraf Yükle (Görsel Analiz İçin)", type=["jpg", "jpeg", "png"])
-    prompt = st.chat_input(f"Laboratuvara bir komut veya araştırma sorusu yaz, {st.session_state.user_name}...")
+    
+    input_placeholders = {
+        "Türkçe": f"Laboratuvara bir komut veya araştırma sorusu yaz, {st.session_state.user_name}...",
+        "English": f"Type a command or research question into the lab, {st.session_state.user_name}...",
+        "Español": f"Escribe un comando o pregunta de investigación en el laboratorio, {st.session_state.user_name}...",
+        "Deutsch": f"Geben Sie einen Befehl oder eine Forschungsfrage ein, {st.session_state.user_name}...",
+        "Français": f"Tapez une commande ou une question de recherche, {st.session_state.user_name}...",
+        "العربية": f"اكتب أمراً أو سؤالاً بحثياً في المختبر يا {st.session_state.user_name}..."
+    }
+    current_placeholder = input_placeholders.get(st.session_state.selected_lang, input_placeholders["Türkçe"])
+
+    prompt = st.chat_input(current_placeholder)
 
     if prompt or uploaded_image:
-        user_input_text = prompt if prompt else "Yüklediğim tıbbi illüstrasyonu/görseli analiz edip yorumlar mısın?"
+        user_input_text = prompt if prompt else "Yüklediğim görseli analiz eder misin?"
         
         if uploaded_image:
-            user_input_text += " [Kullanıcı bir görsel yükledi ve incelenmesini istiyor]"
+            user_input_text += " [Kullanıcı bir görsel yükledi]"
 
         save_message_to_db(st.session_state.user_name, st.session_state.current_chat_id, "user", user_input_text)
 
@@ -267,9 +291,9 @@ else:
             formatted_messages.append({"role": m["role"], "content": m["content"]})
 
         try:
-            with st.spinner("Lidya küresel akademik verileri tarıyor ve illüstrasyonu inceliyor... 🧪"):
+            with st.spinner("Lidya küresel akademik verileri tarıyor... 🧪"):
                 response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama3-70b-8192",
                     messages=formatted_messages,
                 )
                 bot_reply = response.choices[0].message.content
