@@ -177,7 +177,7 @@ translations = {
         "module_title": "🔬 Ilustración Médica y 3D",
         "module_info": "Módulo activo para agregar bocetos de anatomía a informes.",
         "change_id": "🔑 Cambiar ID / Idioma",
-        "api_error": "⚠️️ ¡No se encontró la clave GROQ_API_KEY!",
+        "api_error": "⚠️ ¡No se encontró la clave GROQ_API_KEY!",
         "spinner": "Lidya está explorando datos académicos... 🧪"
     },
     "Deutsch": {
@@ -388,7 +388,7 @@ else:
         try:
             with st.spinner(t["spinner"]):
                 response = client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model="llama3-8b-8192",
                     messages=formatted_messages,
                 )
                 bot_reply = response.choices[0].message.content
