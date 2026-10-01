@@ -129,7 +129,117 @@ if "selected_lang" not in st.session_state:
     st.session_state.selected_lang = "Türkçe"
 
 # ==========================================
-# 3. İSİM VE KÜRESEL DİL SEÇİMİ
+# 3. DİL SÖZLÜĞÜ (ARAYÜZ ÇEVİRİLERİ)
+# ==========================================
+translations = {
+    "Türkçe": {
+        "panel_title": "🧪 Laboratuvar Paneli",
+        "scientist": "👤 **Bilim İnsanı:**",
+        "active_lang": "🌍 **Aktif Dil:**",
+        "new_chat": "➕ Yeni Sohbet Aç",
+        "past_chats": "📜 Geçmiş Sohbetler",
+        "notes_title": "📝 Araştırma Not Defteri",
+        "notes_placeholder": "Anlık Notlar",
+        "save_notes": "Notları Kaydet",
+        "notes_saved": "Notlar veritabanına kaydedildi!",
+        "module_title": "🔬 Tıbbi İllüstrasyon & 3D Modül",
+        "module_info": "Kendi anatomi çizimlerinizi araştırma raporlarına ekleme modülü aktif.",
+        "change_id": "🔑 Kimliği / Dili Değiştir",
+        "upload_label": "📷 Tıbbi İllüstrasyon veya Fotoğraf Yükle (Görsel Analiz İçin)",
+        "api_error": "⚠️ GROQ_API_KEY anahtarı bulunamadı! Lütfen ayarlara ekleyin.",
+        "spinner": "Lidya küresel akademik verileri tarıyor... 🧪"
+    },
+    "English": {
+        "panel_title": "🧪 Laboratory Panel",
+        "scientist": "👤 **Scientist:**",
+        "active_lang": "🌍 **Active Lang:**",
+        "new_chat": "➕ New Chat",
+        "past_chats": "📜 Past Chats",
+        "notes_title": "📝 Research Notepad",
+        "notes_placeholder": "Quick Notes",
+        "save_notes": "Save Notes",
+        "notes_saved": "Notes saved to database!",
+        "module_title": "🔬 Medical Illustration & 3D",
+        "module_info": "Module for adding custom anatomy sketches to research reports is active.",
+        "change_id": "🔑 Change ID / Language",
+        "upload_label": "📷 Upload Medical Illustration or Photo (For Visual Analysis)",
+        "api_error": "⚠️️ GROQ_API_KEY key not found! Please add it to secrets.",
+        "spinner": "Lidya is scanning global academic data... 🧪"
+    },
+    "Español": {
+        "panel_title": "🧪 Panel de Laboratorio",
+        "scientist": "👤 **Científico:**",
+        "active_lang": "🌍 **Idioma Activo:**",
+        "new_chat": "➕ Nuevo Chat",
+        "past_chats": "📜 Chats Anteriores",
+        "notes_title": "📝 Bloc de Notas",
+        "notes_placeholder": "Notas rápidas",
+        "save_notes": "Guardar Notas",
+        "notes_saved": "¡Notas guardadas en la base de datos!",
+        "module_title": "🔬 Ilustración Médica y 3D",
+        "module_info": "Módulo activo para agregar bocetos de anatomía a informes.",
+        "change_id": "🔑 Cambiar ID / Idioma",
+        "upload_label": "📷 Subir Ilustración Médica o Foto (Para Análisis Visual)",
+        "api_error": "⚠️ ¡No se encontró la clave GROQ_API_KEY!",
+        "spinner": "Lidya está explorando datos académicos... 🧪"
+    },
+    "Deutsch": {
+        "panel_title": "🧪 Laborpanel",
+        "scientist": "👤 **Wissenschaftler:**",
+        "active_lang": "🌍 **Aktive Sprache:**",
+        "new_chat": "➕ Neuer Chat",
+        "past_chats": "📜 Vergangene Chats",
+        "notes_title": "📝 Forschungsnotizbuch",
+        "notes_placeholder": "Schnelle Notizen",
+        "save_notes": "Notizen Speichern",
+        "notes_saved": "Notizen in Datenbank gespeichert!",
+        "module_title": "🔬 Medizinische Illustration & 3D",
+        "module_info": "Modul zum Hinzufügen eigener Anatomiezeichnungen ist aktiv.",
+        "change_id": "🔑 ID / Sprache Ändern",
+        "upload_label": "📷 Medizinische Illustration oder Foto hochladen",
+        "api_error": "⚠️ GROQ_API_KEY nicht gefunden!",
+        "spinner": "Lidya scannt globale akademische Daten... 🧪"
+    },
+    "Français": {
+        "panel_title": "🧪 Panneau de Laboratoire",
+        "scientist": "👤 **Scientifique:**",
+        "active_lang": "🌍 **Langue Active:**",
+        "new_chat": "➕ Nouvelle Discussion",
+        "past_chats": "📜 Discussions Précédentes",
+        "notes_title": "📝 Bloc-Notes de Recherche",
+        "notes_placeholder": "Notes Rapides",
+        "save_notes": "Enregistrer les Notes",
+        "notes_saved": "Notes enregistrées dans la base de données !",
+        "module_title": "🔬 Illustration Médicale & 3D",
+        "module_info": "Module d'ajout de croquis anatomiques actif.",
+        "change_id": "🔑 Changer d'Identifiant / Langue",
+        "upload_label": "📷 Télécharger une Illustration Médicale ou Photo",
+        "api_error": "⚠️ Clé GROQ_API_KEY introuvable !",
+        "spinner": "Lidya analyse les données académiques... 🧪"
+    },
+    "العربية": {
+        "panel_title": "🧪 لوحة المختبر",
+        "scientist": "👤 **الباحث:**",
+        "active_lang": "🌍 **اللغة النشطة:**",
+        "new_chat": "➕ محادثة جديدة",
+        "past_chats": "📜 المحادثات السابقة",
+        "notes_title": "📝 دفتر ملاحظات البحث",
+        "notes_placeholder": "ملاحظات سريعة",
+        "save_notes": "حفظ الملاحظات",
+        "notes_saved": "تم حفظ الملاحظات في قاعدة البيانات!",
+        "module_title": "🔬 الرسوم الطبية والنمذجة ثلاثية الأبعاد",
+        "module_info": "وحدة إضافة رسومات التشريح الخاصة بك إلى التقارير نشطة.",
+        "change_id": "🔑 تغيير الهوية / اللغة",
+        "upload_label": "📷 رفع رسم طبى أو صورة للتحليل البصري",
+        "api_error": "⚠️️ لم يتم العثور على مفتاح GROQ_API_KEY!",
+        "spinner": "ليديا تقوم بمسح البيانات الأكاديمية... 🧪"
+    }
+}
+
+t = translations[st.session_state.selected_lang]
+
+# ==========================================
+# 4. İSİM VE KÜRESEL DİL SEÇİMİ
 # ==========================================
 if not st.session_state.user_name:
     st.markdown(
@@ -159,24 +269,24 @@ if not st.session_state.user_name:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# 4. SOHBET VE ARAÇLAR PANELI
+# 5. SOHBET VE ARAÇLAR PANELI
 # ==========================================
 else:
-    # A. SOL YAN PANEL
+    # A. SOL YAN PANEL (Dinamik Çeviri ile)
     with st.sidebar:
-        st.title("🧪 Laboratuvar Paneli")
-        st.write(f"👤 **Bilim İnsanı:** {st.session_state.user_name}")
-        st.write(f"🌍 **Aktif Dil:** {st.session_state.selected_lang}")
+        st.title(t["panel_title"])
+        st.write(f"{t['scientist']} {st.session_state.user_name}")
+        st.write(f"{t['active_lang']} {st.session_state.selected_lang}")
         st.write("---")
 
         user_chats = get_all_user_chats(st.session_state.user_name)
 
-        if st.button("➕ Yeni Sohbet Aç", use_container_width=True):
+        if st.button(t["new_chat"], use_container_width=True):
             new_id = f"Sohbet {len(user_chats) + 1}"
             st.session_state.current_chat_id = new_id
             st.rerun()
 
-        st.write("### 📜 Geçmiş Sohbetler")
+        st.write(f"### {t['past_chats']}")
         for chat_id in user_chats:
             cols = st.columns([3, 1])
             if cols[0].button(f"🗨️ {chat_id}", key=f"btn_{chat_id}", use_container_width=True):
@@ -184,19 +294,19 @@ else:
                 st.rerun()
 
         st.write("---")
-        st.write("### 📝 Araştırma Not Defteri")
+        st.write(f"### {t['notes_title']}")
         current_note = load_note_from_db(st.session_state.user_name)
-        updated_note = st.text_area("Anlık Notlar", value=current_note, height=140)
-        if st.button("Notları Kaydet", use_container_width=True):
+        updated_note = st.text_area(t["notes_placeholder"], value=current_note, height=140)
+        if st.button(t["save_notes"], use_container_width=True):
             save_note_to_db(st.session_state.user_name, updated_note)
-            st.success("Notlar veritabanına kaydedildi!")
+            st.success(t["notes_saved"])
 
         st.write("---")
-        st.write("### 🔬 Tıbbi İllüstrasyon & 3D Modül")
-        st.info("Kendi anatomi çizimlerinizi araştırma raporlarına ekleme modülü aktif.")
+        st.write(f"### {t['module_title']}")
+        st.info(t["module_info"])
 
         st.write("---")
-        if st.button("🔑 Kimliği / Dili Değiştir"):
+        if st.button(t["change_id"]):
             st.session_state.user_name = None
             st.rerun()
 
@@ -218,7 +328,7 @@ else:
     # Groq API Kontrolü
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
     if not api_key:
-        st.error("⚠️ GROQ_API_KEY anahtarı bulunamadı! Lütfen ayarlara ekleyin.")
+        st.error(t["api_error"])
         st.stop()
 
     client = Groq(api_key=api_key)
@@ -263,7 +373,7 @@ else:
     # C. ÇOK MODLU GİRİŞ (METİN + FOTOĞRAF/İLLÜSTRASYON YÜKLEME)
     st.write("---")
     
-    uploaded_image = st.file_uploader("📷 Tıbbi İllüstrasyon veya Fotoğraf Yükle (Görsel Analiz İçin)", type=["jpg", "jpeg", "png"])
+    uploaded_image = st.file_uploader(t["upload_label"], type=["jpg", "jpeg", "png"])
     
     input_placeholders = {
         "Türkçe": f"Laboratuvara bir komut veya araştırma sorusu yaz, {st.session_state.user_name}...",
@@ -290,7 +400,7 @@ else:
             formatted_messages.append({"role": m["role"], "content": m["content"]})
 
         try:
-            with st.spinner("Lidya küresel akademik verileri tarıyor... 🧪"):
+            with st.spinner(t["spinner"]):
                 response = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=formatted_messages,
