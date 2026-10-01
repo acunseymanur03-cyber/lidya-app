@@ -13,4 +13,4 @@ langchain
 langchain-community
 chromadb
 groq
-gtts==2.5.1
+gTTS==2.5.1
