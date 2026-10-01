@@ -242,7 +242,6 @@ else:
             
             if msg["role"] == "assistant" and GTTS_AVAILABLE:
                 try:
-                    # Dil kodunu gTTS için ayarla
                     lang_code_map = {"Türkçe": "tr", "English": "en", "Español": "es", "Deutsch": "de", "Français": "fr", "العربية": "ar"}
                     tts_lang = lang_code_map.get(st.session_state.selected_lang, "tr")
                     
@@ -293,7 +292,7 @@ else:
         try:
             with st.spinner("Lidya küresel akademik verileri tarıyor... 🧪"):
                 response = client.chat.completions.create(
-                    model="llama3-70b-8192",
+                    model="llama-3.3-70b-versatile",
                     messages=formatted_messages,
                 )
                 bot_reply = response.choices[0].message.content
