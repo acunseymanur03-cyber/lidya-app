@@ -388,7 +388,7 @@ else:
         try:
             with st.spinner(t["spinner"]):
                 response = client.chat.completions.create(
-                    model="llama3-8b-8192",
+                    model="llama-3.3-70b-versatile",
                     messages=formatted_messages,
                 )
                 bot_reply = response.choices[0].message.content
