@@ -2,8 +2,6 @@ import streamlit as st
 import os
 import json
 import urllib.request
-from gtts import gTTS
-from duckduckgo_search import DDGS
 
 # Sayfa Ayarları
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
@@ -49,7 +47,7 @@ translations = {
         "title": "🧠 Lidya - Yapay Zeka Asistanı",
         "welcome": f"Hoş geldin {{user_name}}! Seninle sohbet etmek için buradayım. 🧠✨",
         "placeholder": f"Mesajını buraya yaz, {{user_name}}...",
-        "spinner": "Lidya düşünüyor ve gerekirse araştırıyor... 🧪",
+        "spinner": "Lidya düşünüyor... 🧪",
         "error": "Bir hata oluştu: "
     },
     "English": {
@@ -61,11 +59,11 @@ translations = {
         "title": "🧠 Lidya - AI Assistant",
         "welcome": f"Welcome {{user_name}}! I'm here to chat with you. 🧠✨",
         "placeholder": f"Type your message here, {{user_name}}...",
-        "spinner": "Lidya is thinking and searching if needed... 🧪",
+        "spinner": "Lidya is thinking... 🧪",
         "error": "An error occurred: "
     },
     "Deutsch": {
-        "sidebar_title": "⚙️️ Einstellungen & Verwaltung",
+        "sidebar_title": "⚙ Einstellungen & Verwaltung",
         "name_label": "Name ändern:",
         "lang_label": "Sprache / Language:",
         "new_chat": "➕ Neuer Chat",
@@ -96,13 +94,11 @@ t = translations[st.session_state.language]
 with st.sidebar:
     st.markdown(f"### {t['sidebar_title']}")
     
-    # İsim Değiştirme
     yeni_isim = st.text_input(t["name_label"], value=st.session_state.user_name)
     if yeni_isim != st.session_state.user_name:
         st.session_state.user_name = yeni_isim
         st.rerun()
 
-    # Dil Seçimi
     secilen_dil = st.selectbox(t["lang_label"], list(translations.keys()), index=list(translations.keys()).index(st.session_state.language))
     if secilen_dil != st.session_state.language:
         st.session_state.language = secilen_dil
@@ -110,14 +106,12 @@ with st.sidebar:
 
     st.write("---")
 
-    # Yeni Sohbet Oluştur
     if st.button(t["new_chat"]):
         yeni_id = f"sohbet_{len(st.session_state.all_chats) + 1}"
         st.session_state.all_chats[yeni_id] = []
         st.session_state.current_chat_id = yeni_id
         st.rerun()
 
-    # Sohbeti Temizle
     if st.button(t["clear_chat"]):
         st.session_state.all_chats[st.session_state.current_chat_id] = []
         st.rerun()
@@ -132,7 +126,7 @@ if not api_key:
     st.error("⚠️ GOOGLE_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
     st.stop()
 
-# Doğrudan Google Gemini API Bağlantısı (Yerleşik kütüphane ile)
+# Doğrudan Google Gemini API Bağlantısı
 def call_gemini_api(prompt, history, system_instruction):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     
@@ -168,24 +162,10 @@ Konuşma/yanıt dili: {st.session_state.language}. Kullanıcı hangi dilde konu�
 current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
 # Geçmiş mesajları ekrana yazdır
-for i, msg in enumerate(current_messages):
+for msg in current_messages:
     avatar = "🧠" if msg["role"] == "model" else None
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
-
-    # Asistan mesajlarının altına ses oynatıcı ekle
-    if msg["role"] == "model":
-        try:
-            lang_map = {"Türkçe": "tr", "English": "en", "Deutsch": "de", "Français": "fr"}
-            dil_kodu = lang_map.get(st.session_state.language, "tr")
-            tts = gTTS(text=msg["content"], lang=dil_kodu, slow=False)
-            audio_file = f"temp_audio_{i}.mp3"
-            tts.save(audio_file)
-            with open(audio_file, "rb") as f:
-                audio_bytes = f.read()
-            st.audio(audio_bytes, format="audio/mp3")
-        except Exception:
-            pass
 
 # Mesaj Girişi
 st.write("---")
@@ -194,23 +174,9 @@ prompt = st.chat_input(t["placeholder"].format(user_name=st.session_state.user_n
 if prompt:
     current_messages.append({"role": "user", "content": prompt})
 
-    # İnternet Arama Desteği
-    web_context = ""
-    try:
-        with DDGS() as ddgs:
-            results = list(ddgs.text(prompt, max_results=3))
-            if results:
-                web_context = "Güncel Web Bilgileri:\n" + "\n".join([f"- {r['title']}: {r['body']}" for r in results])
-    except Exception:
-        pass
-
-    final_prompt = prompt
-    if web_context:
-        final_prompt = f"{web_context}\n\nSoru: {prompt}"
-
     try:
         with st.spinner(t["spinner"]):
-            bot_reply = call_gemini_api(final_prompt, current_messages[:-1], system_instruction)
+            bot_reply = call_gemini_api(prompt, current_messages[:-1], system_instruction)
 
         current_messages.append({"role": "model", "content": bot_reply})
         st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
