@@ -1,200 +1,102 @@
-import os
-import requests
 import streamlit as st
+import os
 from groq import Groq
 from gtts import gTTS
 
-# ==========================================
-# 1. SAYFA VE TASARIM AYARLARI
-# ==========================================
-st.set_page_config(page_title="🧠 Lidya - Akıllı Ev Asistanı", layout="wide", page_icon="🧪")
+# Sayfa Ayarları
+st.set_page_config(page_title="Lidya - Akıllı Ev Asistanı", page_icon="🧠", layout="centered")
 
-st.markdown(
-    """
-<style>
-    .stApp {
-        background-color: #0d1117;
-        color: #c9d1d9;
+# CSS Stilleri
+st.markdown("""
+    <style>
+    .main {
+        background-color: #0e1117;
+        color: #ffffff;
     }
-    .lab-title {
-        color: #58a6ff;
-        text-align: center;
-        font-family: 'Courier New', monospace;
-        font-size: 38px;
-        font-weight: bold;
-        margin-bottom: 5px;
+    .stTextInput > div > div > input {
+        background-color: #262730;
+        color: white;
     }
-    .lab-intro {
-        text-align: center;
-        color: #8b949e;
-        font-size: 18px;
-        margin-bottom: 25px;
-    }
-    .welcome-card {
-        background-color: #161b22;
-        padding: 30px;
-        border-radius: 15px;
-        border: 1px solid #30363d;
-        text-align: center;
-        margin-top: 20px;
-    }
-</style>
-""",
-    unsafe_allow_html=True,
-)
+    </style>
+""", unsafe_allow_html=True)
 
-# ==========================================
-# 2. HAFIZA VE DURUM YÖNETİMİ (Session State)
-# ==========================================
+# Başlık
+st.markdown("### 🧠 Lidya - Akıllı Ev Asistanı")
+st.markdown("Hoş geldin! Evdeki cihazları yönetmek için buradayım. 🏠💡")
+
+# Oturum Durumu Başlangıcı
 if "user_name" not in st.session_state:
-    st.session_state.user_name = None
+    st.session_state.user_name = "Şeymanur"
 
 if "all_chats" not in st.session_state:
-    st.session_state.all_chats = {"Sohbet 1": []}
+    st.session_state.all_chats = {}
 
 if "current_chat_id" not in st.session_state:
-    st.session_state.current_chat_id = "Sohbet 1"
+    st.session_state.current_chat_id = "sohbet_1"
 
-# ==========================================
-# 3. İSİM ALMA EKRANI
-# ==========================================
-if not st.session_state.user_name:
-    st.markdown(
-        '<p class="lab-title">🧠 Lidya - Laboratuvara Hoş Geldin! 🧪✨</p>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        '<p class="lab-intro">Zihnim aktif, ev otomasyonu ve akıllı sistemler üzerinde çalışmaya hazır mıyız?</p>',
-        unsafe_allow_html=True,
-    )
+if st.session_state.current_chat_id not in st.session_state.all_chats:
+    st.session_state.all_chats[st.session_state.current_chat_id] = []
 
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown('<div class="welcome-card">', unsafe_allow_html=True)
-        st.write("### 🔬 Laboratuvar Kimliği")
-        name_input = st.text_input("Sana nasıl hitap etmemi istersin?", placeholder="Adını yaz...")
+# Groq API Anahtarı Kontrolü
+api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
+if not api_key:
+    st.error("⚠️ GROQ_API_KEY anahtarı bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
+    st.stop()
 
-        if st.button("Sohbete Başla 🚀", use_container_width=True):
-            if name_input.strip():
-                st.session_state.user_name = name_input.strip()
-                st.rerun()
-            else:
-                st.warning("Lütfen geçerli bir isim gir!")
-        st.markdown("</div>", unsafe_allow_html=True)
+client = Groq(api_key=api_key)
 
-# ==========================================
-# 4. SOHBET VE AKILLI EV KONTROL PANELİ
-# ==========================================
-else:
-    # A. SOL YAN PANEL (Sohbetler ve Akıllı Ev Durumu)
-    with st.sidebar:
-        st.title("💬 Sohbet Paneli")
-        st.write(f"👤 **Kullanıcı:** {st.session_state.user_name}")
-        st.write("---")
+system_prompt = f"""
+Senin adın Lidya. Enerjik, akıllı ev sistemlerini yönetebilen bilim odaklı bir yapay zekasın.
+Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
+Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et. Kısa, net ve samimi ol.
+Eğer kullanıcı evdeki bir cihazı (salon lambası, klima, müzik çalar vb.) açmak veya kapatmak isterse yardımcı ol.
+"""
 
-        if st.button("➕ Yeni Sohbet", use_container_width=True):
-            new_id = f"Sohbet {len(st.session_state.all_chats) + 1}"
-            st.session_state.all_chats[new_id] = []
-            st.session_state.current_chat_id = new_id
-            st.rerun()
+current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
-        if st.button("🗑️ Sohbeti Temizle", use_container_width=True):
-            st.session_state.all_chats[st.session_state.current_chat_id] = []
-            st.rerun()
+# Geçmiş mesajları ekrana yazdır
+for i, msg in enumerate(current_messages):
+    avatar = "🧠" if msg["role"] == "assistant" else None
+    with st.chat_message(msg["role"], avatar=avatar):
+        st.markdown(msg["content"])
 
-        st.write("### 📜 Geçmiş Sohbetler")
-        for chat_id in list(st.session_state.all_chats.keys()):
-            if st.button(f"🗨️ {chat_id}", key=f"btn_{chat_id}", use_container_width=True):
-                st.session_state.current_chat_id = chat_id
-                st.rerun()
-
-        st.write("---")
-        st.write("### 🏠 Akıllı Ev Durumu")
+    # Asistan mesajlarının altına ses oynatıcı ekle
+    if msg["role"] == "assistant":
         try:
-            durum_res = requests.get("http://localhost:8000/durum", timeout=2)
-            if durum_res.status_code == 200:
-                cihazlar = durum_res.json()
-                for c_isim, c_bilgi in cihazlar.items():
-                    st.text(f"• {c_isim}: {c_bilgi['durum']}")
-            else:
-                st.text("API bağlantısı bekleniyor...")
-        except:
-            st.text("Akıllı Ev API kapalı (Yerel bağlantı)")
+            tts = gTTS(text=msg["content"], lang="tr", slow=False)
+            audio_file = f"temp_audio_{i}.mp3"
+            tts.save(audio_file)
+            with open(audio_file, "rb") as f:
+                audio_bytes = f.read()
+            st.audio(audio_bytes, format="audio/mp3")
+        except Exception:
+            pass
 
-        st.write("---")
-        if st.button("🔑 İsmi Değiştir"):
-            st.session_state.user_name = None
-            st.rerun()
+# C. MESAJ GİRİŞİ
+st.write("---")
+prompt = st.chat_input(f"Mesajını buraya yaz, {st.session_state.user_name}...")
 
-    # B. SAĞ ANA EKRAN
-    st.markdown('<p class="lab-title">🧠 Lidya - Akıllı Ev Asistanı</p>', unsafe_allow_html=True)
-    st.markdown(
-        f'<p class="lab-intro">Hoş geldin <b>{st.session_state.user_name}</b>! Evdeki cihazları yönetmek için buradayım. 🏠💡</p>',
-        unsafe_allow_html=True,
-    )
-
-    # Groq API Anahtarı Kontrolü
-    api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
-    if not api_key:
-        st.error("⚠️ GROQ_API_KEY anahtarı bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
-        st.stop()
-
-    client = Groq(api_key=api_key)
-
-    system_prompt = f"""
-    Senin adın Lidya. Enerjik, akıllı ev sistemlerini yönetebilen bilim odaklı bir yapay zekasın.
-    Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
-    Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et. Kısa, net ve samimi konuş.
-    Eğer kullanıcı evdeki bir cihazı (salon lambası, klima, müzik çalar vb.) açmak veya kapatmak isterse, ona yardımcı olacağını belirt.
-    """
-
-    current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
-
-    # Geçmiş mesajları ekrana yazdır
-    for i, msg in enumerate(current_messages):
-        avatar = "🧠" if msg["role"] == "assistant" else None
-        with st.chat_message(msg["role"], avatar=avatar):
-            st.markdown(msg["content"])
-            
-            # Asistan mesajlarının altına ses oynatıcı ekle
-            if msg["role"] == "assistant":
-                try:
-                    tts = gTTS(text=msg["content"], lang="tr", slow=False)
-                    audio_file = f"temp_audio_{i}.mp3"
-                    tts.save(audio_file)
-                    with open(audio_file, "rb") as f:
-                        audio_bytes = f.read()
-                    st.audio(audio_bytes, format="audio/mp3")
-                except Exception:
-                    pass
-
-    # C. MESAJ GİRİŞİ
-    st.write("---")
-    prompt = st.chat_input(f"Mesajını buraya yaz, {st.session_state.user_name}...")
-
-    if prompt:
-        current_messages.append({"role": "user", "content": prompt})
+if prompt:
+    current_messages.append({"role": "user", "content": prompt})
     
-        model_secimi = "llama-3.1-8b-instant"
+    model_secimi = "llama-3.1-8b-instant"
 
-        formatted_messages = [{"role": "system", "content": system_prompt}]
-        for m in current_messages:
-            formatted_messages.append({"role": m["role"], "content": m["content"]})
+    formatted_messages = [{"role": "system", "content": system_prompt}]
+    for m in current_messages:
+        formatted_messages.append({"role": m["role"], "content": m["content"]})
 
-         try:
-            with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
-                response = client.chat.completions.create(
-                    model=model_secimi,
-                    messages=formatted_messages,
-               )
+    try:
+        with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
+            response = client.chat.completions.create(
+                model=model_secimi,
+                messages=formatted_messages,
+            )
 
-            bot_reply = response.choices[0].message.content
+        bot_reply = response.choices[0].message.content
 
-            current_messages.append({"role": "assistant", "content": bot_reply})
-            st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
-            st.rerun()
+        current_messages.append({"role": "assistant", "content": bot_reply})
+        st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
+        st.rerun()
 
-        except Exception as e:
-            st.error(f"Bir hata oluştu: {e}")
-
-    
+    except Exception as e:
+        st.error(f"Bir hata oluştu: {e}")
