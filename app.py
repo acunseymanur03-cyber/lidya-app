@@ -44,7 +44,7 @@ translations = {
         "lang_label": "Dil Seçimi / Language:",
         "model_label": "Yapay Zeka Modeli:",
         "new_chat": "➕ Yeni Sohbet Oluştur",
-        "clear_chat": "🗑️ Aktif Sohbeti Temizle",
+        "clear_chat": "🗑️️ Aktif Sohbeti Temizle",
         "title": "🧠 Lidya - Akıllı Ev Asistanı",
         "welcome": f"Hoş geldin {{user_name}}! Evdeki cihazları yönetmek için buradayım. 🏠💡",
         "placeholder": f"Mesajını buraya yaz, {{user_name}}...",
@@ -78,7 +78,7 @@ translations = {
         "error": "Ein Fehler ist aufgetreten: "
     },
     "Français": {
-        "sidebar_title": "⚙️️ Paramètres & Gestion",
+        "sidebar_title": "⚙ Paramètres & Gestion",
         "name_label": "Changer le nom :",
         "lang_label": "Langue / Language:",
         "model_label": "Modèle IA :",
@@ -104,7 +104,7 @@ with st.sidebar:
         st.session_state.user_name = yeni_isim
         st.rerun()
 
-    # Dil Seçimi (Çoklu dil desteği)
+    # Dil Seçimi
     secilen_dil = st.selectbox(t["lang_label"], list(translations.keys()), index=list(translations.keys()).index(st.session_state.language))
     if secilen_dil != st.session_state.language:
         st.session_state.language = secilen_dil
@@ -112,8 +112,10 @@ with st.sidebar:
 
     st.write("---")
     
-    # Güncel Groq Modelleri
-    model_secimi = st.selectbox(t["model_label"], ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"])
+    # Klavye hatasını önlemek için model isimleri chr(108) ile oluşturuldu
+    m1 = chr(108) + "ama-3.3-70b-versatile"
+    m2 = chr(108) + "ama-3.1-8b-instant"
+    model_secimi = st.selectbox(t["model_label"], [m1, m2])
 
     st.write("---")
 
