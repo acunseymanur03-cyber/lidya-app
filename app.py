@@ -52,7 +52,7 @@ translations = {
         "error": "Bir hata oluştu: "
     },
     "English": {
-        "sidebar_title": "⚙️️ Settings & Management",
+        "sidebar_title": "⚙ Settings & Management",
         "name_label": "Change Name:",
         "lang_label": "Language / Dil Seçimi:",
         "model_label": "AI Model:",
@@ -112,8 +112,8 @@ with st.sidebar:
 
     st.write("---")
     
-    # Klavye hatası almamak için 'g' harfiyle başlayan güncel Groq modelleri
-    model_secimi = st.selectbox(t["model_label"], ["gemma2-9b-it", "mixtral-8x7b-32768"])
+    # Güncel model seçimi (Klavye hatası olmaması için güvenli birleştirme)
+    model_secimi = st.selectbox(t["model_label"], ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"])
 
     st.write("---")
 
@@ -196,4 +196,3 @@ if prompt:
 
     except Exception as e:
         st.error(f"{t['error']}{e}")
-
