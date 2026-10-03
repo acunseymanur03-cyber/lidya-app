@@ -4,7 +4,7 @@ from groq import Groq
 from gtts import gTTS
 
 # Sayfa Ayarları
-st.set_page_config(page_title="Lidya - Smart Assistant", page_icon="🧠", layout="centered")
+st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
 
 # CSS Stilleri
 st.markdown("""
@@ -44,24 +44,24 @@ translations = {
         "lang_label": "Dil Seçimi / Language:",
         "model_label": "Yapay Zeka Modeli:",
         "new_chat": "➕ Yeni Sohbet Oluştur",
-        "clear_chat": "🗑️️ Aktif Sohbeti Temizle",
-        "title": "🧠 Lidya - Akıllı Ev Asistanı",
-        "welcome": f"Hoş geldin {{user_name}}! Evdeki cihazları yönetmek için buradayım. 🏠💡",
+        "clear_chat": "🗑️ Aktif Sohbeti Temizle",
+        "title": "🧠 Lidya - Yapay Zeka Asistanı",
+        "welcome": f"Hoş geldin {{user_name}}! Seninle sohbet etmek için buradayım. 🧠✨",
         "placeholder": f"Mesajını buraya yaz, {{user_name}}...",
-        "spinner": "Lidya düşünüyor ve evi kontrol ediyor... 🧪",
+        "spinner": "Lidya düşünüyor... 🧪",
         "error": "Bir hata oluştu: "
     },
     "English": {
-        "sidebar_title": "⚙️ Settings & Management",
+        "sidebar_title": "⚙️️ Settings & Management",
         "name_label": "Change Name:",
         "lang_label": "Language / Dil Seçimi:",
         "model_label": "AI Model:",
         "new_chat": "➕ New Chat",
         "clear_chat": "🗑️ Clear Active Chat",
-        "title": "🧠 Lidya - Smart Home Assistant",
-        "welcome": f"Welcome {{user_name}}! I'm here to manage smart home devices. 🏠💡",
+        "title": "🧠 Lidya - AI Assistant",
+        "welcome": f"Welcome {{user_name}}! I'm here to chat with you. 🧠✨",
         "placeholder": f"Type your message here, {{user_name}}...",
-        "spinner": "Lidya is thinking and checking the house... 🧪",
+        "spinner": "Lidya is thinking... 🧪",
         "error": "An error occurred: "
     },
     "Deutsch": {
@@ -71,10 +71,10 @@ translations = {
         "model_label": "KI-Modell:",
         "new_chat": "➕ Neuer Chat",
         "clear_chat": "🗑️ Aktiven Chat leeren",
-        "title": "🧠 Lidya - Smart-Home-Assistent",
-        "welcome": f"Willkommen {{user_name}}! Ich bin hier, um Smart-Home-Geräte zu verwalten. 🏠💡",
+        "title": "🧠 Lidya - KI-Assistent",
+        "welcome": f"Willkommen {{user_name}}! Ich bin hier, um mit dir zu chatten. 🧠✨",
         "placeholder": f"Schreibe deine Nachricht hier, {{user_name}}...",
-        "spinner": "Lidya denkt nach und überprüft das Haus... 🧪",
+        "spinner": "Lidya denkt nach... 🧪",
         "error": "Ein Fehler ist aufgetreten: "
     },
     "Français": {
@@ -84,10 +84,10 @@ translations = {
         "model_label": "Modèle IA :",
         "new_chat": "➕ Nouvelle discussion",
         "clear_chat": "🗑️ Effacer la discussion active",
-        "title": "🧠 Lidya - Assistant Domotique",
-        "welcome": f"Bienvenue {{user_name}} ! Je suis là pour gérer les appareils intelligents. 🏠💡",
+        "title": "🧠 Lidya - Assistant IA",
+        "welcome": f"Bienvenue {{user_name}} ! Je suis là pour discuter avec vous. 🧠✨",
         "placeholder": f"Tapez votre message ici, {{user_name}}...",
-        "spinner": "Lidya réfléchit et vérifie la maison... 🧪",
+        "spinner": "Lidya réfléchit... 🧪",
         "error": "Une erreur s'est produite : "
     }
 }
@@ -112,10 +112,8 @@ with st.sidebar:
 
     st.write("---")
     
-    # Klavye hatasını önlemek için model isimleri güvenli kodlandı
-    m1 = "".join([chr(108), chr(108), chr(97), chr(109), chr(97), chr(45), chr(51), chr(46), chr(51), chr(45), chr(55), chr(48), chr(98), chr(45), chr(118), chr(101), chr(114), chr(115), chr(97), chr(116), chr(105), chr(108), chr(101)])
-    m2 = "".join([chr(108), chr(108), chr(97), chr(109), chr(97), chr(45), chr(51), chr(46), chr(49), chr(45), chr(56), chr(98), chr(45), chr(105), chr(110), chr(115), chr(116), chr(97), chr(110), chr(116)])
-    model_secimi = st.selectbox(t["model_label"], [m1, m2])
+    # Klavye hatası almamak için 'g' harfiyle başlayan güncel Groq modelleri
+    model_secimi = st.selectbox(t["model_label"], ["gemma2-9b-it", "mixtral-8x7b-32768"])
 
     st.write("---")
 
@@ -144,11 +142,10 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 system_prompt = f"""
-Senin adın Lidya. Enerjik, akıllı ev sistemlerini yönetebilen bilim odaklı bir yapay zekasın.
+Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
 Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
-Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et. Kısa, net ve samimi ol.
+Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et. Kısa, net, samimi ve yardımcı ol.
 Konuşma/yanıt dili: {st.session_state.language}. Kullanıcı hangi dilde konuşuyorsa veya arayüzde hangi dil seçiliyse o dilde yanıt ver.
-Eğer kullanıcı evdeki bir cihazı (salon lambası, klima, müzik çalar vb.) açmak veya kapatmak isterse yardımcı ol.
 """
 
 current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
@@ -199,3 +196,4 @@ if prompt:
 
     except Exception as e:
         st.error(f"{t['error']}{e}")
+
