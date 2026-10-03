@@ -179,14 +179,19 @@ else:
         for m in current_messages:
             formatted_messages.append({"role": m["role"], "content": m["content"]})
 
-        model_secimi = "llama" + "-3.1-8b-instant"
+               parca1 = "llama-"
+               parca2 = "3.1-8b-"
+               parca3 = "instant"
+               model_secimi = parca1 + parca2 + parca3
 
-        try:
+
+                try:
             with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
                 response = client.chat.completions.create(
                     model=model_secimi,
                     messages=formatted_messages,
                 )
+
 
 
 
