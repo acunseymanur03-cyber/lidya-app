@@ -44,7 +44,7 @@ translations = {
         "lang_label": "Dil Seçimi / Language:",
         "model_label": "Yapay Zeka Modeli:",
         "new_chat": "➕ Yeni Sohbet Oluştur",
-        "clear_chat": "🗑️️ Aktif Sohbeti Temizle",
+        "clear_chat": "🗑 Aktif Sohbeti Temizle",
         "title": "🧠 Lidya - Yapay Zeka Asistanı",
         "welcome": f"Hoş geldin {{user_name}}! Seninle sohbet etmek için buradayım. 🧠✨",
         "placeholder": f"Mesajını buraya yaz, {{user_name}}...",
@@ -112,11 +112,9 @@ with st.sidebar:
 
     st.write("---")
     
-    # Klavye hatasını engellemek için model isimleri kodla üretildi
-    m1 = "".join([chr(108), chr(108), chr(97), chr(109), chr(97), chr(45), chr(51), chr(46), chr(49), chr(45), chr(56), chr(98), chr(45), chr(105), chr(110), chr(115), chr(116), chr(97), chr(110), chr(116)])
-    m2 = "".join([chr(108), chr(108), chr(97), chr(109), chr(97), chr(45), chr(51), chr(46), chr(51), chr(45), chr(55), chr(48), chr(98), chr(45), chr(118), chr(101), chr(114), chr(115), chr(97), chr(116), chr(105), chr(108), chr(101)])
-    
-    model_secimi = st.selectbox(t["model_label"], [m1, m2])
+    # Klavye hatasını tamamen devre dışı bırakan güvenli kodlama
+    m_secim = "".join([chr(108), chr(108), chr(97), chr(109), chr(97), chr(45), chr(51), chr(46), chr(49), chr(45), chr(56), chr(98), chr(45), chr(105), chr(110), chr(115), chr(116), chr(97), chr(110), chr(116)])
+    st.write(f"**Model:** {m_secim}")
 
     st.write("---")
 
@@ -187,7 +185,7 @@ if prompt:
     try:
         with st.spinner(t["spinner"]):
             response = client.chat.completions.create(
-                model=model_secimi,
+                model=m_secim,
                 messages=formatted_messages,
             )
 
