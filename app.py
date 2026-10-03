@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from google import genai
+import google.generativeai as genai
 from gtts import gTTS
 from duckduckgo_search import DDGS
 
@@ -125,21 +125,19 @@ with st.sidebar:
 st.markdown(f"### {t['title']}")
 st.markdown(t["welcome"].format(user_name=st.session_state.user_name))
 
-# Google Gemini API Anahtarı Kontrolü (Streamlit Secrets içerisinden GOOGLE_API_KEY okunur)
+# Google Gemini API Anahtarı Kontrolü
 api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 if not api_key:
-    st.error("⚠️ GOOGLE_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına GEMINI/GOOGLE API anahtarınızı ekleyin.")
+    st.error("⚠️️ GOOGLE_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
     st.stop()
 
-# Google GenAI İstemcisi
-client = genai.Client(api_key=api_key)
+genai.configure(api_key=api_key)
 
 system_instruction = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
 Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
 Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et. Kısa, net, samimi ve yardımcı ol.
 Konuşma/yanıt dili: {st.session_state.language}. Kullanıcı hangi dilde konuşuyorsa veya arayüzde hangi dil seçiliyse o dilde yanıt ver.
-Eğer kullanıcı güncel bir bilgi sorarsa veya internetten araştırılması gereken bir şey isterse, sana sağlanan arama sonuçlarını kullanarak akıllıca cevap ver.
 """
 
 current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
@@ -171,7 +169,7 @@ prompt = st.chat_input(t["placeholder"].format(user_name=st.session_state.user_n
 if prompt:
     current_messages.append({"role": "user", "content": prompt})
 
-    # İnternet Arama Desteği (Google / Web Araması)
+    # İnternet Arama Desteği
     web_context = ""
     try:
         with DDGS() as ddgs:
@@ -181,23 +179,23 @@ if prompt:
     except Exception:
         pass
 
-    # Gemini için geçmiş sohbet geçmişini yapılandır
-    formatted_history = []
-    for m in current_messages[:-1]:
-        role = "user" if m["role"] == "user" else "model"
-        formatted_history.append({"role": role, "parts": [{"text": m["content"]}]})
-
     full_prompt = prompt
     if web_context:
         full_prompt = f"{web_context}\n\nKullanıcı Sorusu: {prompt}"
 
     try:
         with st.spinner(t["spinner"]):
-            chat = client.chats.create(
-                model="gemini-2.5-flash",
-                history=formatted_history,
-                config={"system_instruction": system_instruction}
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
+                system_instruction=system_instruction
             )
+            
+            history = []
+            for m in current_messages[:-1]:
+                role = "user" if m["role"] == "user" else "model"
+                history.append({"role": role, "parts": [m["content"]]})
+            
+            chat = model.start_chat(history=history)
             response = chat.send_message(full_prompt)
             bot_reply = response.text
 
