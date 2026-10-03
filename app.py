@@ -182,10 +182,11 @@ else:
         try:
             with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
                 response = client.chat.completions.create(
-                    model="llama-3.1" + "-8b-instant",
-
+                    model_adi = "llama-3.1-8b-instant",
+                    model=model_adi,
                     messages=formatted_messages,
                 )
+
                 
                 bot_reply = response.choices[0].message.content
 
