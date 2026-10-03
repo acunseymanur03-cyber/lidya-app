@@ -1,7 +1,8 @@
 import streamlit as st
 import os
-from groq import Groq
+from google import genai
 from gtts import gTTS
+from duckduckgo_search import DDGS
 
 # Sayfa Ayarları
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
@@ -47,7 +48,7 @@ translations = {
         "title": "🧠 Lidya - Yapay Zeka Asistanı",
         "welcome": f"Hoş geldin {{user_name}}! Seninle sohbet etmek için buradayım. 🧠✨",
         "placeholder": f"Mesajını buraya yaz, {{user_name}}...",
-        "spinner": "Lidya düşünüyor... 🧪",
+        "spinner": "Lidya düşünüyor ve gerekirse Google'a bakıyor... 🧪",
         "error": "Bir hata oluştu: "
     },
     "English": {
@@ -59,7 +60,7 @@ translations = {
         "title": "🧠 Lidya - AI Assistant",
         "welcome": f"Welcome {{user_name}}! I'm here to chat with you. 🧠✨",
         "placeholder": f"Type your message here, {{user_name}}...",
-        "spinner": "Lidya is thinking... 🧪",
+        "spinner": "Lidya is thinking and searching Google if needed... 🧪",
         "error": "An error occurred: "
     },
     "Deutsch": {
@@ -71,7 +72,7 @@ translations = {
         "title": "🧠 Lidya - KI-Assistent",
         "welcome": f"Willkommen {{user_name}}! Ich bin hier, um mit dir zu chatten. 🧠✨",
         "placeholder": f"Schreibe deine Nachricht hier, {{user_name}}...",
-        "spinner": "Lidya denkt nach... 🧪",
+        "spinner": "Lidya denkt nach und sucht bei Google... 🧪",
         "error": "Ein Fehler ist aufgetreten: "
     },
     "Français": {
@@ -83,7 +84,7 @@ translations = {
         "title": "🧠 Lidya - Assistant IA",
         "welcome": f"Bienvenue {{user_name}} ! Je suis là pour discuter avec vous. 🧠✨",
         "placeholder": f"Tapez votre message ici, {{user_name}}...",
-        "spinner": "Lidya réfléchit... 🧪",
+        "spinner": "Lidya réfléchit et cherche sur Google... 🧪",
         "error": "Une erreur s'est produite : "
     }
 }
@@ -124,34 +125,33 @@ with st.sidebar:
 st.markdown(f"### {t['title']}")
 st.markdown(t["welcome"].format(user_name=st.session_state.user_name))
 
-# Groq API Anahtarı Kontrolü
-api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
+# Google Gemini API Anahtarı Kontrolü (Streamlit Secrets içerisinden GOOGLE_API_KEY okunur)
+api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 if not api_key:
-    st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
+    st.error("⚠️ GOOGLE_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına GEMINI/GOOGLE API anahtarınızı ekleyin.")
     st.stop()
 
-client = Groq(api_key=api_key)
+# Google GenAI İstemcisi
+client = genai.Client(api_key=api_key)
 
-# Klavyelerin bozamayacağı şifreli model adı tanımı
-model_adi = "".join([chr(c) for c in [108, 108, 97, 109, 97, 45, 51, 46, 49, 45, 56, 98, 45, 105, 110, 115, 116, 97, 110, 116]])
-
-system_prompt = f"""
+system_instruction = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
 Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
 Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et. Kısa, net, samimi ve yardımcı ol.
 Konuşma/yanıt dili: {st.session_state.language}. Kullanıcı hangi dilde konuşuyorsa veya arayüzde hangi dil seçiliyse o dilde yanıt ver.
+Eğer kullanıcı güncel bir bilgi sorarsa veya internetten araştırılması gereken bir şey isterse, sana sağlanan arama sonuçlarını kullanarak akıllıca cevap ver.
 """
 
 current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
 # Geçmiş mesajları ekrana yazdır
 for i, msg in enumerate(current_messages):
-    avatar = "🧠" if msg["role"] == "assistant" else None
+    avatar = "🧠" if msg["role"] == "model" else None
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
     # Asistan mesajlarının altına ses oynatıcı ekle
-    if msg["role"] == "assistant":
+    if msg["role"] == "model":
         try:
             lang_map = {"Türkçe": "tr", "English": "en", "Deutsch": "de", "Français": "fr"}
             dil_kodu = lang_map.get(st.session_state.language, "tr")
@@ -171,20 +171,37 @@ prompt = st.chat_input(t["placeholder"].format(user_name=st.session_state.user_n
 if prompt:
     current_messages.append({"role": "user", "content": prompt})
 
-    formatted_messages = [{"role": "system", "content": system_prompt}]
-    for m in current_messages:
-        formatted_messages.append({"role": m["role"], "content": m["content"]})
+    # İnternet Arama Desteği (Google / Web Araması)
+    web_context = ""
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(prompt, max_results=3))
+            if results:
+                web_context = "Güncel Web Arama Sonuçları:\n" + "\n".join([f"- {r['title']}: {r['body']}" for r in results])
+    except Exception:
+        pass
+
+    # Gemini için geçmiş sohbet geçmişini yapılandır
+    formatted_history = []
+    for m in current_messages[:-1]:
+        role = "user" if m["role"] == "user" else "model"
+        formatted_history.append({"role": role, "parts": [{"text": m["content"]}]})
+
+    full_prompt = prompt
+    if web_context:
+        full_prompt = f"{web_context}\n\nKullanıcı Sorusu: {prompt}"
 
     try:
         with st.spinner(t["spinner"]):
-            response = client.chat.completions.create(
-                model=model_adi,
-                messages=formatted_messages,
+            chat = client.chats.create(
+                model="gemini-2.5-flash",
+                history=formatted_history,
+                config={"system_instruction": system_instruction}
             )
+            response = chat.send_message(full_prompt)
+            bot_reply = response.text
 
-        bot_reply = response.choices[0].message.content
-
-        current_messages.append({"role": "assistant", "content": bot_reply})
+        current_messages.append({"role": "model", "content": bot_reply})
         st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
         st.rerun()
 
