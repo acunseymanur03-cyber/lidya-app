@@ -1,6 +1,7 @@
 import streamlit as st
 import os
-import google.generativeai as genai
+import json
+import urllib.request
 from gtts import gTTS
 from duckduckgo_search import DDGS
 
@@ -48,7 +49,7 @@ translations = {
         "title": "🧠 Lidya - Yapay Zeka Asistanı",
         "welcome": f"Hoş geldin {{user_name}}! Seninle sohbet etmek için buradayım. 🧠✨",
         "placeholder": f"Mesajını buraya yaz, {{user_name}}...",
-        "spinner": "Lidya düşünüyor ve gerekirse Google'a bakıyor... 🧪",
+        "spinner": "Lidya düşünüyor ve gerekirse araştırıyor... 🧪",
         "error": "Bir hata oluştu: "
     },
     "English": {
@@ -60,11 +61,11 @@ translations = {
         "title": "🧠 Lidya - AI Assistant",
         "welcome": f"Welcome {{user_name}}! I'm here to chat with you. 🧠✨",
         "placeholder": f"Type your message here, {{user_name}}...",
-        "spinner": "Lidya is thinking and searching Google if needed... 🧪",
+        "spinner": "Lidya is thinking and searching if needed... 🧪",
         "error": "An error occurred: "
     },
     "Deutsch": {
-        "sidebar_title": "⚙️ Einstellungen & Verwaltung",
+        "sidebar_title": "⚙️️ Einstellungen & Verwaltung",
         "name_label": "Name ändern:",
         "lang_label": "Sprache / Language:",
         "new_chat": "➕ Neuer Chat",
@@ -72,7 +73,7 @@ translations = {
         "title": "🧠 Lidya - KI-Assistent",
         "welcome": f"Willkommen {{user_name}}! Ich bin hier, um mit dir zu chatten. 🧠✨",
         "placeholder": f"Schreibe deine Nachricht hier, {{user_name}}...",
-        "spinner": "Lidya denkt nach und sucht bei Google... 🧪",
+        "spinner": "Lidya denkt nach... 🧪",
         "error": "Ein Fehler ist aufgetreten: "
     },
     "Français": {
@@ -84,7 +85,7 @@ translations = {
         "title": "🧠 Lidya - Assistant IA",
         "welcome": f"Bienvenue {{user_name}} ! Je suis là pour discuter avec vous. 🧠✨",
         "placeholder": f"Tapez votre message ici, {{user_name}}...",
-        "spinner": "Lidya réfléchit et cherche sur Google... 🧪",
+        "spinner": "Lidya réfléchit... 🧪",
         "error": "Une erreur s'est produite : "
     }
 }
@@ -125,13 +126,37 @@ with st.sidebar:
 st.markdown(f"### {t['title']}")
 st.markdown(t["welcome"].format(user_name=st.session_state.user_name))
 
-# Google Gemini API Anahtarı Kontrolü
+# API Anahtarı Kontrolü
 api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 if not api_key:
-    st.error("⚠️️ GOOGLE_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
+    st.error("⚠️ GOOGLE_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
     st.stop()
 
-genai.configure(api_key=api_key)
+# Doğrudan Google Gemini API Bağlantısı (Yerleşik kütüphane ile)
+def call_gemini_api(prompt, history, system_instruction):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    full_text = f"Talimat: {system_instruction}\n\nGeçmiş Sohbet:\n"
+    for h in history:
+        role = "Kullanıcı" if h["role"] == "user" else "Lidya"
+        full_text += f"{role}: {h['content']}\n"
+    full_text += f"Kullanıcı: {prompt}\nLidya:"
+
+    payload = {
+        "contents": [{
+            "parts": [{"text": full_text}]
+        }]
+    }
+    
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    
+    try:
+        with urllib.request.urlopen(req) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            return res_data["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        return f"Bağlantı Hatası: {str(e)}"
 
 system_instruction = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
@@ -175,29 +200,17 @@ if prompt:
         with DDGS() as ddgs:
             results = list(ddgs.text(prompt, max_results=3))
             if results:
-                web_context = "Güncel Web Arama Sonuçları:\n" + "\n".join([f"- {r['title']}: {r['body']}" for r in results])
+                web_context = "Güncel Web Bilgileri:\n" + "\n".join([f"- {r['title']}: {r['body']}" for r in results])
     except Exception:
         pass
 
-    full_prompt = prompt
+    final_prompt = prompt
     if web_context:
-        full_prompt = f"{web_context}\n\nKullanıcı Sorusu: {prompt}"
+        final_prompt = f"{web_context}\n\nSoru: {prompt}"
 
     try:
         with st.spinner(t["spinner"]):
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
-                system_instruction=system_instruction
-            )
-            
-            history = []
-            for m in current_messages[:-1]:
-                role = "user" if m["role"] == "user" else "model"
-                history.append({"role": role, "parts": [m["content"]]})
-            
-            chat = model.start_chat(history=history)
-            response = chat.send_message(full_prompt)
-            bot_reply = response.text
+            bot_reply = call_gemini_api(final_prompt, current_messages[:-1], system_instruction)
 
         current_messages.append({"role": "model", "content": bot_reply})
         st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
