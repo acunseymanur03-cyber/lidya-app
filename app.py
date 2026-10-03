@@ -43,7 +43,7 @@ translations = {
         "name_label": "Adını Değiştir:",
         "lang_label": "Dil Seçimi / Language:",
         "new_chat": "➕ Yeni Sohbet Oluştur",
-        "clear_chat": "🗑 Aktif Sohbeti Temizle",
+        "clear_chat": "🗑 Geçmişi Temizle",
         "title": "🧠 Lidya - Yapay Zeka Asistanı",
         "welcome": f"Hoş geldin {{user_name}}! Seninle sohbet etmek için buradayım. 🧠✨",
         "placeholder": f"Mesajını buraya yaz, {{user_name}}...",
@@ -55,7 +55,7 @@ translations = {
         "name_label": "Change Name:",
         "lang_label": "Language / Dil Seçimi:",
         "new_chat": "➕ New Chat",
-        "clear_chat": "🗑️ Clear Active Chat",
+        "clear_chat": "🗑️ Clear Chat",
         "title": "🧠 Lidya - AI Assistant",
         "welcome": f"Welcome {{user_name}}! I'm here to chat with you. 🧠✨",
         "placeholder": f"Type your message here, {{user_name}}...",
@@ -67,7 +67,7 @@ translations = {
         "name_label": "Name ändern:",
         "lang_label": "Sprache / Language:",
         "new_chat": "➕ Neuer Chat",
-        "clear_chat": "🗑️ Aktiven Chat leeren",
+        "clear_chat": "🗑️️ Chat leeren",
         "title": "🧠 Lidya - KI-Assistent",
         "welcome": f"Willkommen {{user_name}}! Ich bin hier, um mit dir zu chatten. 🧠✨",
         "placeholder": f"Schreibe deine Nachricht hier, {{user_name}}...",
@@ -79,7 +79,7 @@ translations = {
         "name_label": "Changer le nom :",
         "lang_label": "Langue / Language:",
         "new_chat": "➕ Nouvelle discussion",
-        "clear_chat": "🗑️ Effacer la discussion active",
+        "clear_chat": "🗑️ Effacer la discussion",
         "title": "🧠 Lidya - Assistant IA",
         "welcome": f"Bienvenue {{user_name}} ! Je suis là pour discuter avec vous. 🧠✨",
         "placeholder": f"Tapez votre message ici, {{user_name}}...",
@@ -115,7 +115,7 @@ with st.sidebar:
         st.session_state.current_chat_id = yeni_id
         st.rerun()
 
-    # Sohbeti Sil
+    # Sohbeti Temizle
     if st.button(t["clear_chat"]):
         st.session_state.all_chats[st.session_state.current_chat_id] = []
         st.rerun()
@@ -132,8 +132,8 @@ if not api_key:
 
 client = Groq(api_key=api_key)
 
-# Klavye hatalarından %100 korumalı model adı tanımı
-guvenli_model = "".join([chr(108), chr(108), chr(97), chr(109), chr(97), chr(45), chr(51), chr(46), chr(49), chr(45), chr(56), chr(98), chr(45), chr(105), chr(110), chr(115), chr(116), chr(97), chr(110), chr(116)])
+# Model adı tamamen otomatik ve kodun içinde güvenli şekilde tanımlandı
+guvenli_model = "llama-3.1-8b-instant"
 
 system_prompt = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
@@ -164,7 +164,7 @@ for i, msg in enumerate(current_messages):
         except Exception:
             pass
 
-# C. MESAJ GİRİŞİ
+# Mesaj Girişi
 st.write("---")
 prompt = st.chat_input(t["placeholder"].format(user_name=st.session_state.user_name))
 
