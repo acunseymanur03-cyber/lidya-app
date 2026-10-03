@@ -179,7 +179,7 @@ else:
         for m in current_messages:
             formatted_messages.append({"role": m["role"], "content": m["content"]})
 
-        model_secimi = "llama-3.1-8b-instant"
+        model_secimi = "mixtral-8x7b-32768"
 
         try:
             with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
