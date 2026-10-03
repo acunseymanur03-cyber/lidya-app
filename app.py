@@ -98,7 +98,7 @@ else:
             st.session_state.current_chat_id = new_id
             st.rerun()
 
-        if st.button("🗑️️ Sohbeti Temizle", use_container_width=True):
+        if st.button("🗑️ Sohbeti Temizle", use_container_width=True):
             st.session_state.all_chats[st.session_state.current_chat_id] = []
             st.rerun()
 
@@ -172,7 +172,7 @@ else:
     if prompt:
         current_messages.append({"role": "user", "content": prompt})
 
-        # Kota optimizasyonu: Sadece son 6 mesajı modele göndererek token sınırını koruyoruz
+        # Token tasarrufu için son 6 mesajı alıyoruz
         recent_messages = current_messages[-6:]
 
         formatted_messages = [{"role": "system", "content": system_prompt}]
@@ -181,8 +181,8 @@ else:
 
         try:
             with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
-                # Model adını string olarak güvenli şekilde tanımlıyoruz
-                chosen_model = "llama-3.1-8b-instant"
+                # Model adını parçalı birleştirerek kopyalama hatalarını engelliyoruz
+                chosen_model = "llama" + "-" + "3.1" + "-" + "8b" + "-" + "instant"
                 
                 response = client.chat.completions.create(
                     model=chosen_model,
