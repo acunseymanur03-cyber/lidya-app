@@ -27,6 +27,9 @@ if "user_name" not in st.session_state:
 if "language" not in st.session_state:
     st.session_state.language = "Türkçe"
 
+if "groq_model" not in st.session_state:
+    st.session_state.groq_model = "llama-3.1-8b-instant"
+
 if "all_chats" not in st.session_state:
     st.session_state.all_chats = {}
 
@@ -42,7 +45,7 @@ translations = {
         "sidebar_title": "⚙️ Ayarlar & Yönetim",
         "name_label": "Adını Değiştir:",
         "lang_label": "Dil Seçimi / Language:",
-        "model_label": "Yapay Zeka Modeli:",
+        "model_label": "Model Adı (Örn: llama-3.1-8b-instant):",
         "new_chat": "➕ Yeni Sohbet Oluştur",
         "clear_chat": "🗑 Aktif Sohbeti Temizle",
         "title": "🧠 Lidya - Yapay Zeka Asistanı",
@@ -55,7 +58,7 @@ translations = {
         "sidebar_title": "⚙ Settings & Management",
         "name_label": "Change Name:",
         "lang_label": "Language / Dil Seçimi:",
-        "model_label": "AI Model:",
+        "model_label": "Model Name:",
         "new_chat": "➕ New Chat",
         "clear_chat": "🗑️ Clear Active Chat",
         "title": "🧠 Lidya - AI Assistant",
@@ -68,7 +71,7 @@ translations = {
         "sidebar_title": "⚙️ Einstellungen & Verwaltung",
         "name_label": "Name ändern:",
         "lang_label": "Sprache / Language:",
-        "model_label": "KI-Modell:",
+        "model_label": "Modellname:",
         "new_chat": "➕ Neuer Chat",
         "clear_chat": "🗑️ Aktiven Chat leeren",
         "title": "🧠 Lidya - KI-Assistent",
@@ -81,7 +84,7 @@ translations = {
         "sidebar_title": "⚙ Paramètres & Gestion",
         "name_label": "Changer le nom :",
         "lang_label": "Langue / Language:",
-        "model_label": "Modèle IA :",
+        "model_label": "Nom du modèle :",
         "new_chat": "➕ Nouvelle discussion",
         "clear_chat": "🗑️ Effacer la discussion active",
         "title": "🧠 Lidya - Assistant IA",
@@ -112,9 +115,11 @@ with st.sidebar:
 
     st.write("---")
     
-    # Klavye hatasını tamamen devre dışı bırakan güvenli kodlama
-    m_secim = "".join([chr(108), chr(108), chr(97), chr(109), chr(97), chr(45), chr(51), chr(46), chr(49), chr(45), chr(56), chr(98), chr(45), chr(105), chr(110), chr(115), chr(116), chr(97), chr(110), chr(116)])
-    st.write(f"**Model:** {m_secim}")
+    # Model İsmini Elle Yazma Alanı (Klavyenin kopyalama hatasını engeller)
+    girilen_model = st.text_input(t["model_label"], value=st.session_state.groq_model)
+    if girilen_model != st.session_state.groq_model:
+        st.session_state.groq_model = girilen_model.strip()
+        st.rerun()
 
     st.write("---")
 
@@ -185,7 +190,7 @@ if prompt:
     try:
         with st.spinner(t["spinner"]):
             response = client.chat.completions.create(
-                model=m_secim,
+                model=st.session_state.groq_model,
                 messages=formatted_messages,
             )
 
