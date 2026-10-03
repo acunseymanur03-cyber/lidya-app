@@ -172,12 +172,14 @@ else:
     st.write("---")
     prompt = st.chat_input(f"Mesajını buraya yaz, {st.session_state.user_name}...")
 
-    if prompt:
-        current_messages.append({"role": "user", "content": prompt})
+           if prompt:
+           current_messages.append({"role": "user", "content": prompt})
+    
+           model_secimi = "llama-3.1-8b-instant"
 
-        formatted_messages = [{"role": "system", "content": system_prompt}]
-        for m in current_messages:
-            formatted_messages.append({"role": m["role"], "content": m["content"]})
+           formatted_messages = [{"role": "system", "content": system_prompt}]
+           for m in current_messages:
+               formatted_messages.append({"role": m["role"], "content": m["content"]})
 
                parca1 = "llama-"
                parca2 = "3.1-8b-"
