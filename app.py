@@ -132,8 +132,8 @@ if not api_key:
 
 client = Groq(api_key=api_key)
 
-# Kesin ve net sohbet modeli
-aktif_model = "llama-3.1-8b-instant"
+# Klavyelerin bozamayacağı şifreli model adı tanımı
+model_adi = "".join([chr(c) for c in [108, 108, 97, 109, 97, 45, 51, 46, 49, 45, 56, 98, 45, 105, 110, 115, 116, 97, 110, 116]])
 
 system_prompt = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
@@ -178,7 +178,7 @@ if prompt:
     try:
         with st.spinner(t["spinner"]):
             response = client.chat.completions.create(
-                model=aktif_model,
+                model=model_adi,
                 messages=formatted_messages,
             )
 
