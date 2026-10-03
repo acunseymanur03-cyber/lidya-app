@@ -4,7 +4,7 @@ from groq import Groq
 from gtts import gTTS
 
 # Sayfa Ayarları
-st.set_page_config(page_title="Lidya - Akıllı Ev Asistanı", page_icon="🧠", layout="centered")
+st.set_page_config(page_title="Lidya - Smart Assistant", page_icon="🧠", layout="centered")
 
 # CSS Stilleri
 st.markdown("""
@@ -36,49 +36,107 @@ if "current_chat_id" not in st.session_state:
 if st.session_state.current_chat_id not in st.session_state.all_chats:
     st.session_state.all_chats[st.session_state.current_chat_id] = []
 
+# Çoklu Dil Sözlüğü
+translations = {
+    "Türkçe": {
+        "sidebar_title": "⚙️ Ayarlar & Yönetim",
+        "name_label": "Adını Değiştir:",
+        "lang_label": "Dil Seçimi / Language:",
+        "model_label": "Yapay Zeka Modeli:",
+        "new_chat": "➕ Yeni Sohbet Oluştur",
+        "clear_chat": "🗑️ Aktif Sohbeti Temizle",
+        "title": "🧠 Lidya - Akıllı Ev Asistanı",
+        "welcome": f"Hoş geldin {{user_name}}! Evdeki cihazları yönetmek için buradayım. 🏠💡",
+        "placeholder": f"Mesajını buraya yaz, {{user_name}}...",
+        "spinner": "Lidya düşünüyor ve evi kontrol ediyor... 🧪",
+        "error": "Bir hata oluştu: "
+    },
+    "English": {
+        "sidebar_title": "⚙️ Settings & Management",
+        "name_label": "Change Name:",
+        "lang_label": "Language / Dil Seçimi:",
+        "model_label": "AI Model:",
+        "new_chat": "➕ New Chat",
+        "clear_chat": "🗑️ Clear Active Chat",
+        "title": "🧠 Lidya - Smart Home Assistant",
+        "welcome": f"Welcome {{user_name}}! I'm here to manage smart home devices. 🏠💡",
+        "placeholder": f"Type your message here, {{user_name}}...",
+        "spinner": "Lidya is thinking and checking the house... 🧪",
+        "error": "An error occurred: "
+    },
+    "Deutsch": {
+        "sidebar_title": "⚙️ Einstellungen & Verwaltung",
+        "name_label": "Name ändern:",
+        "lang_label": "Sprache / Language:",
+        "model_label": "KI-Modell:",
+        "new_chat": "➕ Neuer Chat",
+        "clear_chat": "🗑️ Aktiven Chat leeren",
+        "title": "🧠 Lidya - Smart-Home-Assistent",
+        "welcome": f"Willkommen {{user_name}}! Ich bin hier, um Smart-Home-Geräte zu verwalten. 🏠💡",
+        "placeholder": f"Schreibe deine Nachricht hier, {{user_name}}...",
+        "spinner": "Lidya denkt nach und überprüft das Haus... 🧪",
+        "error": "Ein Fehler ist aufgetreten: "
+    },
+    "Français": {
+        "sidebar_title": "⚙️️ Paramètres & Gestion",
+        "name_label": "Changer le nom :",
+        "lang_label": "Langue / Language:",
+        "model_label": "Modèle IA :",
+        "new_chat": "➕ Nouvelle discussion",
+        "clear_chat": "🗑️ Effacer la discussion active",
+        "title": "🧠 Lidya - Assistant Domotique",
+        "welcome": f"Bienvenue {{user_name}} ! Je suis là pour gérer les appareils intelligents. 🏠💡",
+        "placeholder": f"Tapez votre message ici, {{user_name}}...",
+        "spinner": "Lidya réfléchit et vérifie la maison... 🧪",
+        "error": "Une erreur s'est produite : "
+    }
+}
+
+t = translations[st.session_state.language]
+
 # --- KENAR ÇUBUĞU (SİDEBAR) ---
 with st.sidebar:
-    st.markdown("### ⚙️ Ayarlar & Yönetim")
+    st.markdown(f"### {t['sidebar_title']}")
     
     # İsim Değiştirme
-    yeni_isim = st.text_input("Adını Değiştir:", value=st.session_state.user_name)
+    yeni_isim = st.text_input(t["name_label"], value=st.session_state.user_name)
     if yeni_isim != st.session_state.user_name:
         st.session_state.user_name = yeni_isim
         st.rerun()
 
-    # Dil Seçimi
-    secilen_dil = st.selectbox("Dil Seçimi / Language:", ["Türkçe", "English"], index=0 if st.session_state.language == "Türkçe" else 1)
+    # Dil Seçimi (Çoklu dil desteği)
+    secilen_dil = st.selectbox(t["lang_label"], list(translations.keys()), index=list(translations.keys()).index(st.session_state.language))
     if secilen_dil != st.session_state.language:
         st.session_state.language = secilen_dil
         st.rerun()
 
     st.write("---")
     
-    # Model Seçimi (Klavye hatası olmasın diye menüye aldık!)
-    model_secimi = st.selectbox("Yapay Zeka Modeli:", ["llama-3.1-8b-instant", "llama3-8b-8192"])
+    # Güncel Groq Modelleri
+    model_secimi = st.selectbox(t["model_label"], ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"])
 
     st.write("---")
 
     # Yeni Sohbet Oluştur
-    if st.button("➕ Yeni Sohbet Oluştur"):
+    if st.button(t["new_chat"]):
         yeni_id = f"sohbet_{len(st.session_state.all_chats) + 1}"
         st.session_state.all_chats[yeni_id] = []
         st.session_state.current_chat_id = yeni_id
         st.rerun()
 
     # Sohbeti Sil
-    if st.button("🗑️ Aktif Sohbeti Temizle"):
+    if st.button(t["clear_chat"]):
         st.session_state.all_chats[st.session_state.current_chat_id] = []
         st.rerun()
 
-# Ana Başlık
-st.markdown("### 🧠 Lidya - Akıllı Ev Asistanı")
-st.markdown(f"Hoş geldin {st.session_state.user_name}! Evdeki cihazları yönetmek için buradayım. 🏠💡")
+# Ana Başlık ve Karşılama
+st.markdown(f"### {t['title']}")
+st.markdown(t["welcome"].format(user_name=st.session_state.user_name))
 
 # Groq API Anahtarı Kontrolü
 api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
 if not api_key:
-    st.error("⚠️ GROQ_API_KEY anahtarı bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
+    st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
     st.stop()
 
 client = Groq(api_key=api_key)
@@ -87,7 +145,7 @@ system_prompt = f"""
 Senin adın Lidya. Enerjik, akıllı ev sistemlerini yönetebilen bilim odaklı bir yapay zekasın.
 Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
 Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et. Kısa, net ve samimi ol.
-Konuşma dili: {st.session_state.language}.
+Konuşma/yanıt dili: {st.session_state.language}. Kullanıcı hangi dilde konuşuyorsa veya arayüzde hangi dil seçiliyse o dilde yanıt ver.
 Eğer kullanıcı evdeki bir cihazı (salon lambası, klima, müzik çalar vb.) açmak veya kapatmak isterse yardımcı ol.
 """
 
@@ -102,7 +160,8 @@ for i, msg in enumerate(current_messages):
     # Asistan mesajlarının altına ses oynatıcı ekle
     if msg["role"] == "assistant":
         try:
-            dil_kodu = "tr" if st.session_state.language == "Türkçe" else "en"
+            lang_map = {"Türkçe": "tr", "English": "en", "Deutsch": "de", "Français": "fr"}
+            dil_kodu = lang_map.get(st.session_state.language, "tr")
             tts = gTTS(text=msg["content"], lang=dil_kodu, slow=False)
             audio_file = f"temp_audio_{i}.mp3"
             tts.save(audio_file)
@@ -114,7 +173,7 @@ for i, msg in enumerate(current_messages):
 
 # C. MESAJ GİRİŞİ
 st.write("---")
-prompt = st.chat_input(f"Mesajını buraya yaz, {st.session_state.user_name}...")
+prompt = st.chat_input(t["placeholder"].format(user_name=st.session_state.user_name))
 
 if prompt:
     current_messages.append({"role": "user", "content": prompt})
@@ -124,7 +183,7 @@ if prompt:
         formatted_messages.append({"role": m["role"], "content": m["content"]})
 
     try:
-        with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
+        with st.spinner(t["spinner"]):
             response = client.chat.completions.create(
                 model=model_secimi,
                 messages=formatted_messages,
@@ -137,4 +196,4 @@ if prompt:
         st.rerun()
 
     except Exception as e:
-        st.error(f"Bir hata oluştu: {e}")
+        st.error(f"{t['error']}{e}")
