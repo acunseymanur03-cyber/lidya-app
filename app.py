@@ -132,19 +132,8 @@ if not api_key:
 
 client = Groq(api_key=api_key)
 
-# Otomatik Model Seçici (Kütüphaneden aktif olan ilk uygun modeli kendi çeker)
-@st.cache_resource
-def get_default_model():
-    try:
-        models = client.models.list()
-        for m in models.data:
-            if "instant" in m.id or "8b" in m.id:
-                return m.id
-        return models.data[0].id
-    except Exception:
-        return "llama-3.1-8b-instant"
-
-otomatik_model = get_default_model()
+# Kesin ve net sohbet modeli
+aktif_model = "llama-3.1-8b-instant"
 
 system_prompt = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
@@ -189,7 +178,7 @@ if prompt:
     try:
         with st.spinner(t["spinner"]):
             response = client.chat.completions.create(
-                model=otomatik_model,
+                model=aktif_model,
                 messages=formatted_messages,
             )
 
