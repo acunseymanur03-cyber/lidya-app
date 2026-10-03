@@ -120,35 +120,40 @@ with st.sidebar:
 st.markdown(f"### {t['title']}")
 st.markdown(t["welcome"].format(user_name=st.session_state.user_name))
 
-# API Anahtarı Kontrolü
-api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+# Groq API Anahtarı Kontrolü
+api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
 if not api_key:
-    st.error("⚠️ GOOGLE_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
+    st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
     st.stop()
 
-# Doğrudan Google Gemini API Bağlantısı
-def call_gemini_api(prompt, history, system_instruction):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+# Groq API Bağlantısı (Llama 3 Modeli)
+def call_groq_api(prompt, history, system_instruction):
+    url = "https://api.groq.com/openai/v1/chat/completions"
     
-    full_text = f"Talimat: {system_instruction}\n\nGeçmiş Sohbet:\n"
+    messages = [{"role": "system", "content": system_instruction}]
     for h in history:
-        role = "Kullanıcı" if h["role"] == "user" else "Lidya"
-        full_text += f"{role}: {h['content']}\n"
-    full_text += f"Kullanıcı: {prompt}\nLidya:"
+        messages.append({"role": h["role"], "content": h["content"]})
+    messages.append({"role": "user", "content": prompt})
 
     payload = {
-        "contents": [{
-            "parts": [{"text": full_text}]
-        }]
+        "model": "llama3-70b-8192",
+        "messages": messages
     }
     
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    req = urllib.request.Request(
+        url, 
+        data=data, 
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {api_key}'
+        }
+    )
     
     try:
         with urllib.request.urlopen(req) as response:
             res_data = json.loads(response.read().decode("utf-8"))
-            return res_data["candidates"][0]["content"]["parts"][0]["text"]
+            return res_data["choices"][0]["message"]["content"]
     except Exception as e:
         return f"Bağlantı Hatası: {str(e)}"
 
@@ -163,8 +168,8 @@ current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
 # Geçmiş mesajları ekrana yazdır
 for msg in current_messages:
-    avatar = "🧠" if msg["role"] == "model" else None
-    with st.chat_message(msg["role"], avatar=avatar):
+    avatar = "🧠" if msg["role"] == "assistant" else None
+    with st.chat_message("user" if msg["role"] == "user" else "assistant", avatar=avatar):
         st.markdown(msg["content"])
 
 # Mesaj Girişi
@@ -176,9 +181,9 @@ if prompt:
 
     try:
         with st.spinner(t["spinner"]):
-            bot_reply = call_gemini_api(prompt, current_messages[:-1], system_instruction)
+            bot_reply = call_groq_api(prompt, current_messages[:-1], system_instruction)
 
-        current_messages.append({"role": "model", "content": bot_reply})
+        current_messages.append({"role": "assistant", "content": bot_reply})
         st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
         st.rerun()
 
