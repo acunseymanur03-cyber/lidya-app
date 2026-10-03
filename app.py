@@ -27,9 +27,6 @@ if "user_name" not in st.session_state:
 if "language" not in st.session_state:
     st.session_state.language = "Türkçe"
 
-if "groq_model" not in st.session_state:
-    st.session_state.groq_model = "llama-3.1-8b-instant"
-
 if "all_chats" not in st.session_state:
     st.session_state.all_chats = {}
 
@@ -45,7 +42,6 @@ translations = {
         "sidebar_title": "⚙️ Ayarlar & Yönetim",
         "name_label": "Adını Değiştir:",
         "lang_label": "Dil Seçimi / Language:",
-        "model_label": "Model Adı (Örn: llama-3.1-8b-instant):",
         "new_chat": "➕ Yeni Sohbet Oluştur",
         "clear_chat": "🗑 Aktif Sohbeti Temizle",
         "title": "🧠 Lidya - Yapay Zeka Asistanı",
@@ -58,7 +54,6 @@ translations = {
         "sidebar_title": "⚙ Settings & Management",
         "name_label": "Change Name:",
         "lang_label": "Language / Dil Seçimi:",
-        "model_label": "Model Name:",
         "new_chat": "➕ New Chat",
         "clear_chat": "🗑️ Clear Active Chat",
         "title": "🧠 Lidya - AI Assistant",
@@ -71,7 +66,6 @@ translations = {
         "sidebar_title": "⚙️ Einstellungen & Verwaltung",
         "name_label": "Name ändern:",
         "lang_label": "Sprache / Language:",
-        "model_label": "Modellname:",
         "new_chat": "➕ Neuer Chat",
         "clear_chat": "🗑️ Aktiven Chat leeren",
         "title": "🧠 Lidya - KI-Assistent",
@@ -84,7 +78,6 @@ translations = {
         "sidebar_title": "⚙ Paramètres & Gestion",
         "name_label": "Changer le nom :",
         "lang_label": "Langue / Language:",
-        "model_label": "Nom du modèle :",
         "new_chat": "➕ Nouvelle discussion",
         "clear_chat": "🗑️ Effacer la discussion active",
         "title": "🧠 Lidya - Assistant IA",
@@ -114,14 +107,6 @@ with st.sidebar:
         st.rerun()
 
     st.write("---")
-    
-    # Model İsmini Elle Yazma Alanı (Klavyenin kopyalama hatasını engeller)
-    girilen_model = st.text_input(t["model_label"], value=st.session_state.groq_model)
-    if girilen_model != st.session_state.groq_model:
-        st.session_state.groq_model = girilen_model.strip()
-        st.rerun()
-
-    st.write("---")
 
     # Yeni Sohbet Oluştur
     if st.button(t["new_chat"]):
@@ -146,6 +131,9 @@ if not api_key:
     st.stop()
 
 client = Groq(api_key=api_key)
+
+# Klavye hatalarından %100 korumalı model adı tanımı
+guvenli_model = "".join([chr(108), chr(108), chr(97), chr(109), chr(97), chr(45), chr(51), chr(46), chr(49), chr(45), chr(56), chr(98), chr(45), chr(105), chr(110), chr(115), chr(116), chr(97), chr(110), chr(116)])
 
 system_prompt = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
@@ -190,7 +178,7 @@ if prompt:
     try:
         with st.spinner(t["spinner"]):
             response = client.chat.completions.create(
-                model=st.session_state.groq_model,
+                model=guvenli_model,
                 messages=formatted_messages,
             )
 
