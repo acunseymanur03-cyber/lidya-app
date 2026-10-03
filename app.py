@@ -112,9 +112,9 @@ with st.sidebar:
 
     st.write("---")
     
-    # Klavye hatasını önlemek için model isimleri chr(108) ile oluşturuldu
-    m1 = chr(108) + "ama-3.3-70b-versatile"
-    m2 = chr(108) + "ama-3.1-8b-instant"
+    # Klavye hatasını önlemek için model isimleri güvenli kodlandı
+    m1 = "".join([chr(108), chr(108), chr(97), chr(109), chr(97), chr(45), chr(51), chr(46), chr(51), chr(45), chr(55), chr(48), chr(98), chr(45), chr(118), chr(101), chr(114), chr(115), chr(97), chr(116), chr(105), chr(108), chr(101)])
+    m2 = "".join([chr(108), chr(108), chr(97), chr(109), chr(97), chr(45), chr(51), chr(46), chr(49), chr(45), chr(56), chr(98), chr(45), chr(105), chr(110), chr(115), chr(116), chr(97), chr(110), chr(116)])
     model_secimi = st.selectbox(t["model_label"], [m1, m2])
 
     st.write("---")
