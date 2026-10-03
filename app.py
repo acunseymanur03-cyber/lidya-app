@@ -67,7 +67,7 @@ translations = {
         "name_label": "Name ändern:",
         "lang_label": "Sprache / Language:",
         "new_chat": "➕ Neuer Chat",
-        "clear_chat": "🗑️️ Chat leeren",
+        "clear_chat": "🗑 Chat leeren",
         "title": "🧠 Lidya - KI-Assistent",
         "welcome": f"Willkommen {{user_name}}! Ich bin hier, um mit dir zu chatten. 🧠✨",
         "placeholder": f"Schreibe deine Nachricht hier, {{user_name}}...",
@@ -132,8 +132,19 @@ if not api_key:
 
 client = Groq(api_key=api_key)
 
-# Model adı tamamen otomatik ve kodun içinde güvenli şekilde tanımlandı
-guvenli_model = "llama-3.1-8b-instant"
+# Otomatik Model Seçici (Kütüphaneden aktif olan ilk uygun modeli kendi çeker)
+@st.cache_resource
+def get_default_model():
+    try:
+        models = client.models.list()
+        for m in models.data:
+            if "instant" in m.id or "8b" in m.id:
+                return m.id
+        return models.data[0].id
+    except Exception:
+        return "llama-3.1-8b-instant"
+
+otomatik_model = get_default_model()
 
 system_prompt = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
@@ -178,7 +189,7 @@ if prompt:
     try:
         with st.spinner(t["spinner"]):
             response = client.chat.completions.create(
-                model=guvenli_model,
+                model=otomatik_model,
                 messages=formatted_messages,
             )
 
