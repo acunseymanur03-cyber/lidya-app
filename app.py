@@ -123,10 +123,10 @@ st.markdown(t["welcome"].format(user_name=st.session_state.user_name))
 # Groq API Anahtarı Kontrolü
 api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
 if not api_key:
-    st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
+    st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen bu uygulamanın Secrets ayarlarına ekleyin.")
     st.stop()
 
-# Groq API Bağlantısı (Llama 3 Modeli)
+# Groq API Bağlantısı
 def call_groq_api(prompt, history, system_instruction):
     url = "https://api.groq.com/openai/v1/chat/completions"
     
@@ -154,6 +154,9 @@ def call_groq_api(prompt, history, system_instruction):
         with urllib.request.urlopen(req) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             return res_data["choices"][0]["message"]["content"]
+    except urllib.error.HTTPError as e:
+        error_message = e.read().decode("utf-8")
+        return f"HTTP Hatası ({e.code}): {error_message}"
     except Exception as e:
         return f"Bağlantı Hatası: {str(e)}"
 
