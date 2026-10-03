@@ -86,7 +86,7 @@ if not st.session_state.user_name:
 # 4. SOHBET VE AKILLI EV KONTROL PANELİ
 # ==========================================
 else:
-    # A. SOL YAN PANEL
+    # A. SOL YAN PANEL (Sohbetler ve Akıllı Ev Durumu)
     with st.sidebar:
         st.title("💬 Sohbet Paneli")
         st.write(f"👤 **Kullanıcı:** {st.session_state.user_name}")
@@ -133,6 +133,7 @@ else:
         unsafe_allow_html=True,
     )
 
+    # Groq API Anahtarı Kontrolü
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
     if not api_key:
         st.error("⚠️ GROQ_API_KEY anahtarı bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
@@ -144,6 +145,7 @@ else:
     Senin adın Lidya. Enerjik, akıllı ev sistemlerini yönetebilen bilim odaklı bir yapay zekasın.
     Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
     Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et. Kısa, net ve samimi konuş.
+    Eğer kullanıcı evdeki bir cihazı (salon lambası, klima, müzik çalar vb.) açmak veya kapatmak isterse, ona yardımcı olacağını belirt.
     """
 
     current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
@@ -154,6 +156,7 @@ else:
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
             
+            # Asistan mesajlarının altına ses oynatıcı ekle
             if msg["role"] == "assistant":
                 try:
                     tts = gTTS(text=msg["content"], lang="tr", slow=False)
@@ -172,20 +175,14 @@ else:
     if prompt:
         current_messages.append({"role": "user", "content": prompt})
 
-        # Token tasarrufu için son 6 mesajı alıyoruz
-        recent_messages = current_messages[-6:]
-
         formatted_messages = [{"role": "system", "content": system_prompt}]
-        for m in recent_messages:
+        for m in current_messages:
             formatted_messages.append({"role": m["role"], "content": m["content"]})
 
         try:
             with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
-                # Model adını parçalı birleştirerek kopyalama hatalarını engelliyoruz
-                chosen_model = "llama" + "-" + "3.1" + "-" + "8b" + "-" + "instant"
-                
                 response = client.chat.completions.create(
-                    model=chosen_model,
+                    model="llama-3.3-70b-versatile",
                     messages=formatted_messages,
                 )
                 
