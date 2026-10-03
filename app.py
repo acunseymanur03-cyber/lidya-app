@@ -172,40 +172,29 @@ else:
     st.write("---")
     prompt = st.chat_input(f"Mesajını buraya yaz, {st.session_state.user_name}...")
 
-               if prompt:
+    if prompt:
         current_messages.append({"role": "user", "content": prompt})
-        
+    
         model_secimi = "llama-3.1-8b-instant"
 
         formatted_messages = [{"role": "system", "content": system_prompt}]
         for m in current_messages:
             formatted_messages.append({"role": m["role"], "content": m["content"]})
 
-        try:
+         try:
             with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
                 response = client.chat.completions.create(
                     model=model_secimi,
                     messages=formatted_messages,
-                )
+               )
 
+            bot_reply = response.choices[0].message.content
 
-
-                try:
-            with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
-                response = client.chat.completions.create(
-                    model=model_secimi,
-                    messages=formatted_messages,
-                )
-
-
-
-
-                
-                bot_reply = response.choices[0].message.content
-
-                current_messages.append({"role": "assistant", "content": bot_reply})
-                st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
-                st.rerun()
+            current_messages.append({"role": "assistant", "content": bot_reply})
+            st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
+            st.rerun()
 
         except Exception as e:
             st.error(f"Bir hata oluştu: {e}")
+
+    
