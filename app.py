@@ -86,7 +86,7 @@ if not st.session_state.user_name:
 # 4. SOHBET VE AKILLI EV KONTROL PANELİ
 # ==========================================
 else:
-    # A. SOL YAN PANEL (Sohbetler ve Akıllı Ev Durumu)
+    # A. SOL YAN PANEL
     with st.sidebar:
         st.title("💬 Sohbet Paneli")
         st.write(f"👤 **Kullanıcı:** {st.session_state.user_name}")
@@ -98,7 +98,7 @@ else:
             st.session_state.current_chat_id = new_id
             st.rerun()
 
-        if st.button("🗑️ Sohbeti Temizle", use_container_width=True):
+        if st.button("🗑️️ Sohbeti Temizle", use_container_width=True):
             st.session_state.all_chats[st.session_state.current_chat_id] = []
             st.rerun()
 
@@ -110,7 +110,6 @@ else:
 
         st.write("---")
         st.write("### 🏠 Akıllı Ev Durumu")
-        # FastAPI'den ev durumunu çekip Sidebar'da gösterelim
         try:
             durum_res = requests.get("http://localhost:8000/durum", timeout=2)
             if durum_res.status_code == 200:
@@ -134,7 +133,6 @@ else:
         unsafe_allow_html=True,
     )
 
-    # Groq API Anahtarı Kontrolü
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
     if not api_key:
         st.error("⚠️ GROQ_API_KEY anahtarı bulunamadı! Lütfen Streamlit Secrets ayarlarına ekleyin.")
@@ -146,7 +144,6 @@ else:
     Senin adın Lidya. Enerjik, akıllı ev sistemlerini yönetebilen bilim odaklı bir yapay zekasın.
     Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
     Kullanıcıya kesinlikle kendi adıyla ({st.session_state.user_name}) hitap et. Kısa, net ve samimi konuş.
-    Eğer kullanıcı evdeki bir cihazı (salon lambası, klima, müzik çalar vb.) açmak veya kapatmak isterse, ona yardımcı olacağını belirt.
     """
 
     current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
@@ -157,7 +154,6 @@ else:
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
             
-            # Asistan mesajlarının altına ses oynatıcı ekle
             if msg["role"] == "assistant":
                 try:
                     tts = gTTS(text=msg["content"], lang="tr", slow=False)
@@ -176,15 +172,20 @@ else:
     if prompt:
         current_messages.append({"role": "user", "content": prompt})
 
+        # Kota optimizasyonu: Sadece son 6 mesajı modele göndererek token sınırını koruyoruz
+        recent_messages = current_messages[-6:]
+
         formatted_messages = [{"role": "system", "content": system_prompt}]
-        for m in current_messages:
+        for m in recent_messages:
             formatted_messages.append({"role": m["role"], "content": m["content"]})
 
         try:
             with st.spinner("Lidya düşünüyor ve evi kontrol ediyor... 🧪"):
-                # Aktif ve çalışan model adı tanımlandı
+                # Model adını string olarak güvenli şekilde tanımlıyoruz
+                chosen_model = "llama-3.1-8b-instant"
+                
                 response = client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model=chosen_model,
                     messages=formatted_messages,
                 )
                 
