@@ -1,7 +1,6 @@
 import streamlit as st
 import os
-import json
-import urllib.request
+import google.generativeai as genai
 
 # Sayfa Ayarları
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
@@ -120,45 +119,13 @@ with st.sidebar:
 st.markdown(f"### {t['title']}")
 st.markdown(t["welcome"].format(user_name=st.session_state.user_name))
 
-# Groq API Anahtarı Kontrolü
-api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
+# API Anahtarı Kontrolü
+api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 if not api_key:
-    st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen bu uygulamanın Secrets ayarlarına ekleyin.")
+    st.error("⚠️ GOOGLE_API_KEY bulunamadı! Lütfen Secrets ayarlarına ekleyin.")
     st.stop()
 
-# Groq API Bağlantısı
-def call_groq_api(prompt, history, system_instruction):
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    
-    messages = [{"role": "system", "content": system_instruction}]
-    for h in history:
-        messages.append({"role": h["role"], "content": h["content"]})
-    messages.append({"role": "user", "content": prompt})
-
-    payload = {
-        "model": "llama3-70b-8192",
-        "messages": messages
-    }
-    
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url, 
-        data=data, 
-        headers={
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {api_key}'
-        }
-    )
-    
-    try:
-        with urllib.request.urlopen(req) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            return res_data["choices"][0]["message"]["content"]
-    except urllib.error.HTTPError as e:
-        error_message = e.read().decode("utf-8")
-        return f"HTTP Hatası ({e.code}): {error_message}"
-    except Exception as e:
-        return f"Bağlantı Hatası: {str(e)}"
+genai.configure(api_key=api_key)
 
 system_instruction = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
@@ -171,8 +138,8 @@ current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
 # Geçmiş mesajları ekrana yazdır
 for msg in current_messages:
-    avatar = "🧠" if msg["role"] == "assistant" else None
-    with st.chat_message("user" if msg["role"] == "user" else "assistant", avatar=avatar):
+    avatar = "🧠" if msg["role"] == "model" else None
+    with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
 # Mesaj Girişi
@@ -184,9 +151,21 @@ if prompt:
 
     try:
         with st.spinner(t["spinner"]):
-            bot_reply = call_groq_api(prompt, current_messages[:-1], system_instruction)
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
+                system_instruction=system_instruction
+            )
+            
+            history = []
+            for m in current_messages[:-1]:
+                role = "user" if m["role"] == "user" else "model"
+                history.append({"role": role, "parts": [m["content"]]})
+            
+            chat = model.start_chat(history=history)
+            response = chat.send_message(prompt)
+            bot_reply = response.text
 
-        current_messages.append({"role": "assistant", "content": bot_reply})
+        current_messages.append({"role": "model", "content": bot_reply})
         st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
         st.rerun()
 
