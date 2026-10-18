@@ -4,7 +4,7 @@ import json
 
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
 
-# Doğrudan buraya API anahtarını tırnak içine yazabilirsin (Secrets derdi biter!)
+# Buraya kendi Groq anahtarını tırnak içinde yazabilirsin
 API_KEY = "Gsk_BURAYA_GERCEK_ANAHTARINI_YAPISTIR"
 
 if "user_name" not in st.session_state:
@@ -63,12 +63,14 @@ if prompt:
                 "messages": messages
             }
             
+            # Güvenlik duvarını aşmak için User-Agent eklendi
             req = urllib.request.Request(
                 "https://api.groq.com/openai/v1/chat/completions",
                 data=json.dumps(payload).encode('utf-8'),
                 headers={
                     "Authorization": f"Bearer {API_KEY}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "User-Agent": "Mozilla/5.0"
                 },
                 method="POST"
             )
