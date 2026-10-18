@@ -60,8 +60,8 @@ if not api_key:
 
 client = Groq(api_key=api_key)
 
-# Klavyenin bozamayacağı saf ASCII karakter kodları
-m_ad = "".join([chr(c) for c in [108, 108, 97, 109, 97, 45, 51, 46, 49, 45, 56, 98, 45, 105, 110, 115, 116, 97, 110, 116]])
+# Groq'un en kararlı evrensel modeli (Llama 3.3 70B)
+m_ad = "".join([chr(c) for c in [108, 108, 97, 109, 97, 45, 51, 46, 51, 45, 55, 48, 98, 45, 118, 101, 114, 115, 97, 116, 105, 108, 101]])
 
 system_instruction = "Senin adın Lidya. Kullanıcının adı: Şeymanur. Kısa, samimi ve Türkçe yanıt ver."
 current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
