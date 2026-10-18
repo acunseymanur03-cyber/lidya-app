@@ -1,9 +1,13 @@
 import streamlit as st
+import os
+import urllib.request
+import json
 
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
 
+# Oturum yönetimi (Her gelen kullanıcı kendi adını belirleyebilir)
 if "user_name" not in st.session_state:
-    st.session_state.user_name = "Şeymanur"
+    st.session_state.user_name = "Misafir"
 
 if "all_chats" not in st.session_state:
     st.session_state.all_chats = {}
@@ -16,7 +20,7 @@ if st.session_state.current_chat_id not in st.session_state.all_chats:
 
 with st.sidebar:
     st.markdown("### ⚙️ Ayarlar & Yönetim")
-    yeni_isim = st.text_input("Adını Değiştir:", value=st.session_state.user_name)
+    yeni_isim = st.text_input("İsminiz:", value=st.session_state.user_name)
     if yeni_isim != st.session_state.user_name:
         st.session_state.user_name = yeni_isim
         st.rerun()
@@ -33,7 +37,13 @@ with st.sidebar:
         st.rerun()
 
 st.markdown("### 🧠 Lidya - Yapay Zeka Asistanı")
-st.markdown(f"Hoş geldin {st.session_state.user_name}! Seninle sohbet etmek için buradayım. 🧠✨")
+st.markdown(f"Hoş geldin **{st.session_state.user_name}**! Ben Lidya, sana yardımcı olmak için buradayım. 🧠✨")
+
+# Güvenli API Anahtarı Kontrolü
+api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
+if not api_key:
+    st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına anahtarınızı ekleyin.")
+    st.stop()
 
 current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
@@ -43,14 +53,37 @@ for msg in current_messages:
         st.markdown(msg["content"])
 
 st.write("---")
-prompt = st.chat_input(f"Mesajını buraya yaz, {st.session_state.user_name}...")
+prompt = st.chat_input(f"Mesajınızı yazın, {st.session_state.user_name}...")
 
 if prompt:
     current_messages.append({"role": "user", "content": prompt})
-    
-    # API hatası riski olmayan akıllı yanıt sistemi
-    bot_reply = f"Harika bir soru/yorum, Şeymanur! Lidya olarak projelerini, tıp illüstrasyonlarını ve Oxford/Harvard hedeflerini desteklemek için buradayım. '{prompt}' konusunu birlikte geliştirebiliriz! 🚀"
-    
-    current_messages.append({"role": "assistant", "content": bot_reply})
-    st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
-    st.rerun()
+    try:
+        with st.spinner("Lidya düşünüyor... 🧪"):
+            messages = [{"role": "system", "content": f"Senin adın Lidya. Karşındaki kullanıcının adı: {st.session_state.user_name}. Kibar, akıllı, yardımsever ve Türkçe yanıt veren bir yapay zeka asistanısın."}]
+            for m in current_messages:
+                messages.append({"role": m["role"], "content": m["content"]})
+            
+            payload = {
+                "model": "llama-3.1-8b-instant",
+                "messages": messages
+            }
+            
+            req = urllib.request.Request(
+                "https://api.groq.com/openai/v1/chat/completions",
+                data=json.dumps(payload).encode('utf-8'),
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                method="POST"
+            )
+            
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                bot_reply = res_data["choices"][0]["message"]["content"]
+                
+        current_messages.append({"role": "assistant", "content": bot_reply})
+        st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
+        st.rerun()
+    except Exception as e:
+        st.error(f"Bağlantı hatası oluştu. Lütfen API anahtarınızı kontrol edin.")
