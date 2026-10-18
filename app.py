@@ -66,8 +66,8 @@ if prompt:
                 })
             
             payload = {"contents": contents}
-            # Doğru ve aktif v1beta endpoint adresi
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+            # En kararlı ve hatasız çalışan gemini-pro endpoint adresi
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={API_KEY}"
             
             req = urllib.request.Request(
                 url,
@@ -85,4 +85,3 @@ if prompt:
         st.rerun()
     except Exception as e:
         st.error(f"Bağlantı hatası oluştu: {e}")
-
