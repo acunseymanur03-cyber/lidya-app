@@ -18,6 +18,7 @@ if "current_chat_id" not in st.session_state:
 
 if st.session_state.current_chat_id not in st.session_state.all_chats:
     st.session_state.all_chats[st.session_state.current_chat_id] = []
+
 translations = {
     "Türkçe": {
         "sidebar_title": "⚙️ Ayarlar & Yönetim",
@@ -50,6 +51,7 @@ with st.sidebar:
     if st.button(t["clear_chat"]):
         st.session_state.all_chats[st.session_state.current_chat_id] = []
         st.rerun()
+
 st.markdown(f"### {t['title']}")
 st.markdown(t["welcome"])
 
@@ -60,10 +62,11 @@ if not api_key:
 
 client = Groq(api_key=api_key)
 
-# Groq'un en kararlı evrensel modeli (Llama 3.3 70B)
-m_ad = "".join([chr(c) for c in [108, 108, 97, 109, 97, 45, 51, 46, 51, 45, 55, 48, 98, 45, 118, 101, 114, 115, 97, 116, 105, 108, 101]])
+# Kesinlikle çalışan standart model
+m_ad = "llama3-8b-8192"
 
 system_instruction = "Senin adın Lidya. Kullanıcının adı: Şeymanur. Kısa, samimi ve Türkçe yanıt ver."
+
 current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
 for msg in current_messages:
