@@ -1,11 +1,12 @@
 import streamlit as st
-import os
 import urllib.request
 import json
 
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
 
-# Oturum yönetimi (Her gelen kullanıcı kendi adını belirleyebilir)
+# Doğrudan buraya API anahtarını tırnak içine yazabilirsin (Secrets derdi biter!)
+API_KEY = "Gsk_BURAYA_GERCEK_ANAHTARINI_YAPISTIR"
+
 if "user_name" not in st.session_state:
     st.session_state.user_name = "Misafir"
 
@@ -39,12 +40,6 @@ with st.sidebar:
 st.markdown("### 🧠 Lidya - Yapay Zeka Asistanı")
 st.markdown(f"Hoş geldin **{st.session_state.user_name}**! Ben Lidya, sana yardımcı olmak için buradayım. 🧠✨")
 
-# Güvenli API Anahtarı Kontrolü
-api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
-if not api_key:
-    st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen Streamlit Secrets ayarlarına anahtarınızı ekleyin.")
-    st.stop()
-
 current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
 for msg in current_messages:
@@ -72,7 +67,7 @@ if prompt:
                 "https://api.groq.com/openai/v1/chat/completions",
                 data=json.dumps(payload).encode('utf-8'),
                 headers={
-                    "Authorization": f"Bearer {api_key}",
+                    "Authorization": f"Bearer {API_KEY}",
                     "Content-Type": "application/json"
                 },
                 method="POST"
@@ -86,4 +81,4 @@ if prompt:
         st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
         st.rerun()
     except Exception as e:
-        st.error(f"Bağlantı hatası oluştu. Lütfen API anahtarınızı kontrol edin.")
+        st.error(f"Bağlantı hatası oluştu: {e}")
