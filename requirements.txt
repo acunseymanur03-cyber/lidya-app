@@ -1,16 +1,2 @@
-fastapi
-uvicorn
-pydantic
 streamlit
-scikit-learn
-pandas
-sqlalchemy
-requests
-pyjwt
-passlib[bcrypt]
-python-multipart
-langchain
-langchain-community
-chromadb
 groq
-gTTS==2.5.1
