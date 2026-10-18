@@ -1,21 +1,11 @@
 import streamlit as st
-import subprocess
-import sys
-
-# Resmi kütüphane yoksa otomatik kur
-try:
-    import google.generativeai as genai
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "google-generativeai"])
-    import google.generativeai as genai
+import urllib.request
+import json
 
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
 
-# Buraya Google AI Studio'dan aldığın gerçek Gemini API anahtarını tırnak içinde yaz
-API_KEY = "BURAYA_GEMINI_API_ANAHTARINI_YAPISTIR"
-
-if API_KEY != "BURAYA_GEMINI_API_ANAHTARINI_YAPISTIR":
-    genai.configure(api_key=API_KEY)
+# Anahtarı gizli kasadan (Streamlit Secrets) güvenle alıyoruz (GitHub'da asla görünmez!)
+API_KEY = st.secrets.get("GEMINI_API_KEY")
 
 if "user_name" not in st.session_state:
     st.session_state.user_name = "Misafir"
@@ -50,6 +40,10 @@ with st.sidebar:
 st.markdown("### 🧠 Lidya - Yapay Zeka Asistanı")
 st.markdown(f"Hoş geldin **{st.session_state.user_name}**! Ben Lidya, sana yardımcı olmak için buradayım. 🧠✨")
 
+if not API_KEY:
+    st.error("⚠️ GEMINI_API_KEY bulunamadı! Lütfen Streamlit Cloud panelindeki 'Secrets' bölümüne anahtarınızı ekleyin.")
+    st.stop()
+
 current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
 for msg in current_messages:
@@ -61,26 +55,39 @@ st.write("---")
 prompt = st.chat_input(f"Mesajınızı yazın, {st.session_state.user_name}...")
 
 if prompt:
-    if API_KEY == "BURAYA_GEMINI_API_ANAHTARINI_YAPISTIR":
-        st.error("⚠️ Lütfen koddaki API anahtarını kendi gerçek Gemini anahtarınızla değiştirin!")
-        st.stop()
-        
     current_messages.append({"role": "user", "content": prompt})
     try:
         with st.spinner("Lidya düşünüyor... 🧪"):
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
-                system_instruction=f"Senin adın Lidya. Karşındaki kullanıcının adı: {st.session_state.user_name}. Kibar, akıllı, yardımsever ve Türkçe yanıt veren bir yapay zeka asistanısın."
+            contents = []
+            contents.append({
+                "role": "user",
+                "parts": [{"text": f"Sistem Talimatı: Senin adın Lidya. Karşındaki kullanıcının adı: {st.session_state.user_name}. Kibar, akıllı, yardımsever ve Türkçe yanıt veren bir yapay zeka asistanısın. Sadece bunu onayla ve selamla."}]
+            })
+            contents.append({
+                "role": "model",
+                "parts": [{"text": f"Anlaşıldı! Merhaba {st.session_state.user_name}, ben Lidya. Sana nasıl yardımcı olabilirim?"}]
+            })
+            
+            for m in current_messages:
+                role = "user" if m["role"] == "user" else "model"
+                contents.append({
+                    "role": role,
+                    "parts": [{"text": m["content"]}]
+                })
+            
+            payload = {"contents": contents}
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+            
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={"Content-Type": "application/json"},
+                method="POST"
             )
             
-            history = []
-            for m in current_messages[:-1]:
-                role = "user" if m["role"] == "user" else "model"
-                history.append({"role": role, "parts": [m["content"]]})
-            
-            chat = model.start_chat(history=history)
-            response = chat.send_message(prompt)
-            bot_reply = response.text
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                bot_reply = res_data["candidates"][0]["content"]["parts"][0]["text"]
                 
         current_messages.append({"role": "assistant", "content": bot_reply})
         st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
