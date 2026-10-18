@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-import google.generativeai as genai
+from groq import Groq
 
 # Sayfa Ayarları
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
@@ -120,12 +120,12 @@ st.markdown(f"### {t['title']}")
 st.markdown(t["welcome"].format(user_name=st.session_state.user_name))
 
 # API Anahtarı Kontrolü
-api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
 if not api_key:
-    st.error("⚠️ GOOGLE_API_KEY bulunamadı! Lütfen Secrets ayarlarına ekleyin.")
+    st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen Secrets ayarlarına ekleyin.")
     st.stop()
 
-genai.configure(api_key=api_key)
+client = Groq(api_key=api_key)
 
 system_instruction = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
@@ -138,8 +138,8 @@ current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
 # Geçmiş mesajları ekrana yazdır
 for msg in current_messages:
-    avatar = "🧠" if msg["role"] == "model" else None
-    with st.chat_message(msg["role"], avatar=avatar):
+    avatar = "🧠" if msg["role"] == "assistant" else None
+    with st.chat_message("user" if msg["role"] == "user" else "assistant", avatar=avatar):
         st.markdown(msg["content"])
 
 # Mesaj Girişi
@@ -151,21 +151,17 @@ if prompt:
 
     try:
         with st.spinner(t["spinner"]):
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
-                system_instruction=system_instruction
-            )
-            
-            history = []
-            for m in current_messages[:-1]:
-                role = "user" if m["role"] == "user" else "model"
-                history.append({"role": role, "parts": [m["content"]]})
-            
-            chat = model.start_chat(history=history)
-            response = chat.send_message(prompt)
-            bot_reply = response.text
+            messages = [{"role": "system", "content": system_instruction}]
+            for m in current_messages:
+                messages.append({"role": m["role"], "content": m["content"]})
 
-        current_messages.append({"role": "model", "content": bot_reply})
+            chat_completion = client.chat.completions.create(
+                model="llama3-70b-8192",
+                messages=messages
+            )
+            bot_reply = chat_completion.choices[0].message.content
+
+        current_messages.append({"role": "assistant", "content": bot_reply})
         st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
         st.rerun()
 
