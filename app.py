@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-import google.generativeai as genai
+from groq import Groq
 
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
 
@@ -37,13 +37,13 @@ with st.sidebar:
 st.markdown("### 🧠 Lidya - Yapay Zeka Asistanı")
 st.markdown(f"Hoş geldin {st.session_state.user_name}! Seninle sohbet etmek için buradayım. 🧠✨")
 
-api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
 if not api_key:
-    st.error("⚠️ GOOGLE_API_KEY bulunamadı! Lütfen Secrets ayarlarına GOOGLE_API_KEY ekleyin.")
+    st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen Secrets ayarlarına GROQ_API_KEY ekleyin.")
     st.stop()
 
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-1.5-flash")
+client = Groq(api_key=api_key)
+m_ad = "llama-3.1-8b-instant"
 
 current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
@@ -59,14 +59,12 @@ if prompt:
     current_messages.append({"role": "user", "content": prompt})
     try:
         with st.spinner("Lidya düşünüyor... 🧪"):
-            gemini_history = []
-            for m in current_messages[:-1]:
-                role = "user" if m["role"] == "user" else "model"
-                gemini_history.append({"role": role, "parts": [m["content"]]})
+            messages = [{"role": "system", "content": f"Senin adın Lidya. Kullanıcının adı: {st.session_state.user_name}. Kısa, samimi ve Türkçe yanıt ver."}]
+            for m in current_messages:
+                messages.append({"role": m["role"], "content": m["content"]})
             
-            chat = model.start_chat(history=gemini_history)
-            response = chat.send_message(f"Senin adın Lidya. Kullanıcının adı: {st.session_state.user_name}. Kısa, samimi ve Türkçe yanıt ver.\n\nKullanıcı mesajı: {prompt}")
-            bot_reply = response.text
+            chat_completion = client.chat.completions.create(model=m_ad, messages=messages)
+            bot_reply = chat_completion.choices[0].message.content
             
         current_messages.append({"role": "assistant", "content": bot_reply})
         st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
