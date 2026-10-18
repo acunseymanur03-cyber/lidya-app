@@ -127,6 +127,9 @@ if not api_key:
 
 client = Groq(api_key=api_key)
 
+# Klavyelerin bozamayacağı güvenli model adı tanımı
+guvenli_model = "".join([chr(c) for c in [108, 108, 97, 109, 97, 51, 45, 56, 98, 45, 56, 49, 57, 49, 50]])
+
 system_instruction = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
 Şu an sohbet ettiğin kullanıcının adı: {st.session_state.user_name}.
@@ -156,7 +159,7 @@ if prompt:
                 messages.append({"role": m["role"], "content": m["content"]})
 
             chat_completion = client.chat.completions.create(
-                model="llama3-8b-8192",
+                model=guvenli_model,
                 messages=messages
             )
             bot_reply = chat_completion.choices[0].message.content
