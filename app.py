@@ -4,7 +4,6 @@ import json
 
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
 
-# Anahtarı gizli kasadan (Streamlit Secrets) güvenle alıyoruz (GitHub'da asla görünmez!)
 API_KEY = st.secrets.get("GEMINI_API_KEY")
 
 if "user_name" not in st.session_state:
@@ -59,15 +58,6 @@ if prompt:
     try:
         with st.spinner("Lidya düşünüyor... 🧪"):
             contents = []
-            contents.append({
-                "role": "user",
-                "parts": [{"text": f"Sistem Talimatı: Senin adın Lidya. Karşındaki kullanıcının adı: {st.session_state.user_name}. Kibar, akıllı, yardımsever ve Türkçe yanıt veren bir yapay zeka asistanısın. Sadece bunu onayla ve selamla."}]
-            })
-            contents.append({
-                "role": "model",
-                "parts": [{"text": f"Anlaşıldı! Merhaba {st.session_state.user_name}, ben Lidya. Sana nasıl yardımcı olabilirim?"}]
-            })
-            
             for m in current_messages:
                 role = "user" if m["role"] == "user" else "model"
                 contents.append({
@@ -76,7 +66,8 @@ if prompt:
                 })
             
             payload = {"contents": contents}
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+            # En kararlı v1 endpoint adresi
+            url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
             
             req = urllib.request.Request(
                 url,
