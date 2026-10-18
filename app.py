@@ -62,8 +62,8 @@ if not api_key:
 
 client = Groq(api_key=api_key)
 
-# Kesinlikle çalışan standart model
-m_ad = "llama3-8b-8192"
+# Güncel ve Garantili Model
+m_ad = "llama-3.1-8b-instant"
 
 system_instruction = "Senin adın Lidya. Kullanıcının adı: Şeymanur. Kısa, samimi ve Türkçe yanıt ver."
 
