@@ -1,5 +1,7 @@
 import streamlit as st
 import os
+import urllib.request
+import json
 
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
 
@@ -35,10 +37,6 @@ with st.sidebar:
 
 st.markdown("### 🧠 Lidya - Yapay Zeka Asistanı")
 st.markdown(f"Hoş geldin {st.session_state.user_name}! Seninle sohbet etmek için buradayım. 🧠✨")
-
-# Güvenli İstek Altyapısı (Harici kütüphane hatası yok!)
-import urllib.request
-import json
 
 api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
 if not api_key:
@@ -76,13 +74,6 @@ if prompt:
                     "Content-Type": "application/json"
                 },
                 method="POST"
-            ] if False else urllib.request.Request(
-                "https://api.groq.com/openai/v1/chat/completions",
-                data=json.dumps(payload).encode('utf-8'),
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
             )
             
             with urllib.request.urlopen(req) as response:
