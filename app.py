@@ -4,8 +4,8 @@ import json
 
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
 
-# Buraya kendi Groq anahtarını tırnak içinde yazabilirsin
-API_KEY = "Gsk_BURAYA_GERCEK_ANAHTARINI_YAPISTIR"
+# Buraya Google AI Studio'dan aldığın Gemini API anahtarını tırnak içinde yazabilirsin
+API_KEY = "BURAYA_GEMINI_API_ANAHTARINI_YAPISTIR"
 
 if "user_name" not in st.session_state:
     st.session_state.user_name = "Misafir"
@@ -54,30 +54,33 @@ if prompt:
     current_messages.append({"role": "user", "content": prompt})
     try:
         with st.spinner("Lidya düşünüyor... 🧪"):
-            messages = [{"role": "system", "content": f"Senin adın Lidya. Karşındaki kullanıcının adı: {st.session_state.user_name}. Kibar, akıllı, yardımsever ve Türkçe yanıt veren bir yapay zeka asistanısın."}]
+            contents = []
             for m in current_messages:
-                messages.append({"role": m["role"], "content": m["content"]})
+                role = "user" if m["role"] == "user" else "model"
+                contents.append({
+                    "role": role,
+                    "parts": [{"text": m["content"]}]
+                })
             
             payload = {
-                "model": "llama-3.1-8b-instant",
-                "messages": messages
+                "contents": contents,
+                "system_instruction": {
+                    "parts": [{"text": f"Senin adın Lidya. Karşındaki kullanıcının adı: {st.session_state.user_name}. Kibar, akıllı, yardımsever ve Türkçe yanıt veren bir yapay zeka asistanısın."}]
+                }
             }
             
-            # Güvenlik duvarını aşmak için User-Agent eklendi
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+            
             req = urllib.request.Request(
-                "https://api.groq.com/openai/v1/chat/completions",
+                url,
                 data=json.dumps(payload).encode('utf-8'),
-                headers={
-                    "Authorization": f"Bearer {API_KEY}",
-                    "Content-Type": "application/json",
-                    "User-Agent": "Mozilla/5.0"
-                },
+                headers={"Content-Type": "application/json"},
                 method="POST"
             )
             
             with urllib.request.urlopen(req) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
-                bot_reply = res_data["choices"][0]["message"]["content"]
+                bot_reply = res_data["candidates"][0]["content"]["parts"][0]["text"]
                 
         current_messages.append({"role": "assistant", "content": bot_reply})
         st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
