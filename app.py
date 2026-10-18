@@ -1,3 +1,13 @@
+import subprocess
+import sys
+
+# Kütüphane sunucuda yoksa otomatik yükle (hiçbir şeyi silmene gerek kalmaz!)
+try:
+    import groq
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "groq"])
+    import groq
+
 import streamlit as st
 import os
 from groq import Groq
