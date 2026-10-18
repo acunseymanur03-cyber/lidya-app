@@ -1,16 +1,5 @@
-import subprocess
-import sys
-
-# Kütüphane sunucuda yoksa otomatik yükle (hiçbir şeyi silmene gerek kalmaz!)
-try:
-    import groq
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "groq"])
-    import groq
-
 import streamlit as st
 import os
-from groq import Groq
 
 st.set_page_config(page_title="Lidya - AI Assistant", page_icon="🧠", layout="centered")
 
@@ -47,13 +36,14 @@ with st.sidebar:
 st.markdown("### 🧠 Lidya - Yapay Zeka Asistanı")
 st.markdown(f"Hoş geldin {st.session_state.user_name}! Seninle sohbet etmek için buradayım. 🧠✨")
 
+# Güvenli İstek Altyapısı (Harici kütüphane hatası yok!)
+import urllib.request
+import json
+
 api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
 if not api_key:
-    st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen Secrets ayarlarına GROQ_API_KEY ekleyin.")
+    st.error("⚠️ GROQ_API_KEY bulunamadı!")
     st.stop()
-
-client = Groq(api_key=api_key)
-m_ad = "llama-3.1-8b-instant"
 
 current_messages = st.session_state.all_chats[st.session_state.current_chat_id]
 
@@ -73,9 +63,32 @@ if prompt:
             for m in current_messages:
                 messages.append({"role": m["role"], "content": m["content"]})
             
-            chat_completion = client.chat.completions.create(model=m_ad, messages=messages)
-            bot_reply = chat_completion.choices[0].message.content
+            payload = {
+                "model": "llama-3.1-8b-instant",
+                "messages": messages
+            }
             
+            req = urllib.request.Request(
+                "https://api.groq.com/openai/v1/chat/completions",
+                data=json.dumps(payload).encode('utf-8'),
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                method="POST"
+            ] if False else urllib.request.Request(
+                "https://api.groq.com/openai/v1/chat/completions",
+                data=json.dumps(payload).encode('utf-8'),
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
+            )
+            
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                bot_reply = res_data["choices"][0]["message"]["content"]
+                
         current_messages.append({"role": "assistant", "content": bot_reply})
         st.session_state.all_chats[st.session_state.current_chat_id] = current_messages
         st.rerun()
