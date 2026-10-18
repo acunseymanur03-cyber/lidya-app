@@ -127,8 +127,8 @@ if not api_key:
 
 client = Groq(api_key=api_key)
 
-# Klavyelerin bozamayacağı güvenli model adı birleştirme yöntemi
-guvenli_model = "".join(['l', 'l', 'a', 'm', 'a', '3', '-', '8', 'b', '-', '8', '1', '9', '2'])
+# Klavyelerin bozamayacağı güncel ve güvenli model adı tanımı
+guvenli_model = "".join(['l', 'l', 'a', 'm', 'a', '-', '3', '.', '1', '-', '8', 'b', '-', 'i', 'n', 's', 't', 'a', 'n', 't'])
 
 system_instruction = f"""
 Senin adın Lidya. Enerjik, bilim odaklı ve akıllı bir yapay zekasın.
