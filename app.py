@@ -156,7 +156,7 @@ if prompt:
                 messages.append({"role": m["role"], "content": m["content"]})
 
             chat_completion = client.chat.completions.create(
-                model="llama3-70b-8192",
+                model="llama-3.3-70b-versatile",
                 messages=messages
             )
             bot_reply = chat_completion.choices[0].message.content
