@@ -8,8 +8,6 @@ import time
 import streamlit as st
 import streamlit.components.v1 as components
 
-from google import genai
-
 
 # =====================================================
 # 1. PAGE CONFIGURATION
