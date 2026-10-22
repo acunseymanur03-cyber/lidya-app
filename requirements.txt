@@ -1,2 +1,2 @@
 streamlit
-google-genai
+groq
