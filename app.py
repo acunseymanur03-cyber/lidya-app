@@ -1,16 +1,12 @@
 import os
-import tempfile
+import json
 import streamlit as st
 import streamlit.components.v1 as components
-
-from google import genai
-from google.genai import types
-
+from groq import Groq
 
 # ======================================================
-# 1. PAGE CONFIGURATION
+# 1. PAGE CONFIG
 # ======================================================
-
 st.set_page_config(
     page_title="Lidya AI",
     page_icon="💜",
@@ -18,14 +14,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-
 # ======================================================
-# 2. CONFIGURATION
+# 2. SETTINGS
 # ======================================================
-
-MODEL_NAME = "gemini-3.8-flash"
-
-MAX_FILE_SIZE_MB = 20
+MODEL_NAME = "openai/gpt-oss-20b"
 
 LANGUAGES = {
     "Türkçe": "Turkish",
@@ -37,311 +29,28 @@ LANGUAGES = {
     "日本語": "Japanese",
 }
 
-
-# ======================================================
-# 3. TRANSLATIONS
-# ======================================================
-
-TRANSLATIONS = {
-    "Türkçe": {
-        "subtitle": "Düşün. Öğren. Üret. Keşfet.",
-        "language": "Arayüz ve yanıt dili",
-        "modules": "ÇALIŞMA ALANLARI",
-        "clear": "Sohbeti temizle",
-        "voice": "Yanıtı sesli oku",
-        "thinking": "Lidya düşünüyor...",
-        "chat": "Lidya'ya bir şey sor...",
-        "upload": "İncelemek için dosya yükle",
-        "welcome": "Merhaba! Ben Lidya. Sana nasıl yardımcı olabilirim?",
-        "sources": "Araştırma kaynakları",
-        "no_key": "API anahtarı bulunamadı. Streamlit Secrets ayarını kontrol et.",
-        "file_limit": "Dosya boyutu sınırı",
-        "file_error": "Dosya incelenirken hata oluştu",
-        "chat_error": "Yanıt oluşturulamadı",
-        "footer": "Merakla ve Python ile geliştirildi.",
-        "search_info": "Güncel sorularda Google Search kullanılabilir.",
-        "medical_notice": "Eğitim amaçlıdır; tanı veya tedavi kararlarının yerini tutmaz.",
-        "legal_notice": "Genel hukuki bilgidir; ilgili ülkenin hukukunu doğrula.",
-        "smart_notice": "Bu sürüm akıllı cihazları doğrudan kontrol etmez.",
-        "image_notice": "Bu alan görsel üretimi için istem hazırlamaya ayrılmıştır.",
-        "video_notice": "Bu alan video üretimi için istem hazırlamaya ayrılmıştır.",
-        "prompt_label": "Ne oluşturmak istiyorsun?",
-        "prepare": "İstemi hazırla",
-        "file_selected": "Seçilen dosya",
-        "search_toggle": "İnternet araştırmasını etkinleştir",
-        "search_on": "İnternet araştırması etkin",
-        "search_off": "Yalnızca model bilgisi kullanılıyor",
-    },
-    "English": {
-        "subtitle": "Think. Learn. Create. Discover.",
-        "language": "Interface and response language",
-        "modules": "WORKSPACES",
-        "clear": "Clear conversation",
-        "voice": "Read the answer aloud",
-        "thinking": "Lidya is thinking...",
-        "chat": "Ask Lidya anything...",
-        "upload": "Upload a file to analyze",
-        "welcome": "Hello! I'm Lidya. How can I help you?",
-        "sources": "Research sources",
-        "no_key": "API key not found. Check your Streamlit Secrets.",
-        "file_limit": "File size limit",
-        "file_error": "An error occurred while analyzing the file",
-        "chat_error": "Could not generate a response",
-        "footer": "Built with curiosity and Python.",
-        "search_info": "Google Search can be used for current questions.",
-        "medical_notice": "For education only; not a substitute for diagnosis or treatment.",
-        "legal_notice": "General legal information; verify the applicable jurisdiction.",
-        "smart_notice": "This version does not directly control smart devices.",
-        "image_notice": "This workspace prepares prompts for image generation.",
-        "video_notice": "This workspace prepares prompts for video generation.",
-        "prompt_label": "What would you like to create?",
-        "prepare": "Prepare prompt",
-        "file_selected": "Selected file",
-        "search_toggle": "Enable internet research",
-        "search_on": "Internet research is enabled",
-        "search_off": "Using model knowledge only",
-    },
-    "Français": {
-        "subtitle": "Réfléchir. Apprendre. Créer. Découvrir.",
-        "language": "Langue de l'interface et des réponses",
-        "modules": "ESPACES DE TRAVAIL",
-        "clear": "Effacer la conversation",
-        "voice": "Lire la réponse à voix haute",
-        "thinking": "Lidya réfléchit...",
-        "chat": "Posez une question à Lidya...",
-        "upload": "Importer un fichier à analyser",
-        "welcome": "Bonjour ! Je suis Lidya. Comment puis-je vous aider ?",
-        "sources": "Sources de recherche",
-        "no_key": "Clé API introuvable. Vérifiez les paramètres Secrets.",
-        "file_limit": "Limite de taille du fichier",
-        "file_error": "Erreur lors de l'analyse du fichier",
-        "chat_error": "Impossible de générer une réponse",
-        "footer": "Créé avec curiosité et Python.",
-        "search_info": "Google Search peut être utilisé pour les questions actuelles.",
-        "medical_notice": "À des fins éducatives uniquement, sans remplacer un avis médical.",
-        "legal_notice": "Informations juridiques générales ; vérifiez la juridiction applicable.",
-        "smart_notice": "Cette version ne contrôle pas directement les appareils connectés.",
-        "image_notice": "Cet espace prépare des descriptions pour générer des images.",
-        "video_notice": "Cet espace prépare des descriptions pour générer des vidéos.",
-        "prompt_label": "Que souhaitez-vous créer ?",
-        "prepare": "Préparer la description",
-        "file_selected": "Fichier sélectionné",
-        "search_toggle": "Activer la recherche Internet",
-        "search_on": "Recherche Internet activée",
-        "search_off": "Utilisation des connaissances du modèle uniquement",
-    },
-    "Deutsch": {
-        "subtitle": "Denken. Lernen. Gestalten. Entdecken.",
-        "language": "Sprache der Oberfläche und Antworten",
-        "modules": "ARBEITSBEREICHE",
-        "clear": "Unterhaltung löschen",
-        "voice": "Antwort vorlesen",
-        "thinking": "Lidya denkt nach...",
-        "chat": "Frage Lidya etwas...",
-        "upload": "Datei zur Analyse hochladen",
-        "welcome": "Hallo! Ich bin Lidya. Wie kann ich dir helfen?",
-        "sources": "Recherchequellen",
-        "no_key": "API-Schlüssel fehlt. Überprüfe die Streamlit-Secrets.",
-        "file_limit": "Dateigrößenlimit",
-        "file_error": "Fehler bei der Dateianalyse",
-        "chat_error": "Antwort konnte nicht erstellt werden",
-        "footer": "Mit Neugier und Python entwickelt.",
-        "search_info": "Google Search kann für aktuelle Fragen verwendet werden.",
-        "medical_notice": "Nur zu Bildungszwecken; kein Ersatz für Diagnose oder Behandlung.",
-        "legal_notice": "Allgemeine Rechtsinformationen; die geltende Rechtsordnung prüfen.",
-        "smart_notice": "Diese Version steuert keine Smart-Geräte direkt.",
-        "image_notice": "Dieser Bereich erstellt Eingaben für die Bildgenerierung.",
-        "video_notice": "Dieser Bereich erstellt Eingaben für die Videogenerierung.",
-        "prompt_label": "Was möchtest du erstellen?",
-        "prepare": "Eingabe vorbereiten",
-        "file_selected": "Ausgewählte Datei",
-        "search_toggle": "Internetsuche aktivieren",
-        "search_on": "Internetsuche aktiviert",
-        "search_off": "Nur Modellwissen wird verwendet",
-    },
-    "Español": {
-        "subtitle": "Piensa. Aprende. Crea. Descubre.",
-        "language": "Idioma de la interfaz y las respuestas",
-        "modules": "ESPACIOS DE TRABAJO",
-        "clear": "Borrar conversación",
-        "voice": "Leer la respuesta en voz alta",
-        "thinking": "Lidya está pensando...",
-        "chat": "Pregúntale algo a Lidya...",
-        "upload": "Subir un archivo para analizar",
-        "welcome": "¡Hola! Soy Lidya. ¿Cómo puedo ayudarte?",
-        "sources": "Fuentes de investigación",
-        "no_key": "No se encontró la clave API. Revisa los Secrets.",
-        "file_limit": "Límite de tamaño del archivo",
-        "file_error": "Error al analizar el archivo",
-        "chat_error": "No se pudo generar una respuesta",
-        "footer": "Creado con curiosidad y Python.",
-        "search_info": "Google Search puede utilizarse para preguntas actuales.",
-        "medical_notice": "Solo para educación; no sustituye un diagnóstico o tratamiento.",
-        "legal_notice": "Información jurídica general; verifica la jurisdicción aplicable.",
-        "smart_notice": "Esta versión no controla directamente dispositivos inteligentes.",
-        "image_notice": "Este espacio prepara instrucciones para generar imágenes.",
-        "video_notice": "Este espacio prepara instrucciones para generar vídeos.",
-        "prompt_label": "¿Qué quieres crear?",
-        "prepare": "Preparar instrucciones",
-        "file_selected": "Archivo seleccionado",
-        "search_toggle": "Activar búsqueda en Internet",
-        "search_on": "Búsqueda en Internet activada",
-        "search_off": "Solo se usa el conocimiento del modelo",
-    },
-    "Italiano": {
-        "subtitle": "Pensa. Impara. Crea. Scopri.",
-        "language": "Lingua dell'interfaccia e delle risposte",
-        "modules": "SPAZI DI LAVORO",
-        "clear": "Cancella conversazione",
-        "voice": "Leggi la risposta ad alta voce",
-        "thinking": "Lidya sta pensando...",
-        "chat": "Chiedi qualcosa a Lidya...",
-        "upload": "Carica un file da analizzare",
-        "welcome": "Ciao! Sono Lidya. Come posso aiutarti?",
-        "sources": "Fonti della ricerca",
-        "no_key": "Chiave API mancante. Controlla i Secrets.",
-        "file_limit": "Limite dimensione file",
-        "file_error": "Errore durante l'analisi del file",
-        "chat_error": "Impossibile generare una risposta",
-        "footer": "Creato con curiosità e Python.",
-        "search_info": "Google Search può essere usato per domande attuali.",
-        "medical_notice": "Solo per scopi educativi; non sostituisce diagnosi o cure.",
-        "legal_notice": "Informazioni legali generali; verifica la giurisdizione pertinente.",
-        "smart_notice": "Questa versione non controlla direttamente i dispositivi intelligenti.",
-        "image_notice": "Questo spazio prepara descrizioni per generare immagini.",
-        "video_notice": "Questo spazio prepara descrizioni per generare video.",
-        "prompt_label": "Che cosa vuoi creare?",
-        "prepare": "Prepara la descrizione",
-        "file_selected": "File selezionato",
-        "search_toggle": "Attiva la ricerca su Internet",
-        "search_on": "Ricerca Internet attivata",
-        "search_off": "Si utilizza solo la conoscenza del modello",
-    },
-    "日本語": {
-        "subtitle": "考える。学ぶ。創造する。発見する。",
-        "language": "画面と言語",
-        "modules": "ワークスペース",
-        "clear": "会話を消去",
-        "voice": "回答を読み上げる",
-        "thinking": "Lidyaが考えています...",
-        "chat": "Lidyaに質問する...",
-        "upload": "分析するファイルをアップロード",
-        "welcome": "こんにちは！Lidyaです。どのようにお手伝いできますか？",
-        "sources": "調査ソース",
-        "no_key": "APIキーが見つかりません。Secretsを確認してください。",
-        "file_limit": "ファイルサイズ制限",
-        "file_error": "ファイル分析中にエラーが発生しました",
-        "chat_error": "回答を生成できませんでした",
-        "footer": "好奇心とPythonで開発。",
-        "search_info": "最新の質問にはGoogle Searchを使用できます。",
-        "medical_notice": "教育目的のみです。診断や治療の代わりにはなりません。",
-        "legal_notice": "一般的な法律情報です。適用される法域を確認してください。",
-        "smart_notice": "このバージョンはスマートデバイスを直接操作しません。",
-        "image_notice": "この領域では画像生成用の指示を準備します。",
-        "video_notice": "この領域では動画生成用の指示を準備します。",
-        "prompt_label": "何を作成しますか？",
-        "prepare": "指示を準備",
-        "file_selected": "選択したファイル",
-        "search_toggle": "インターネット検索を有効にする",
-        "search_on": "インターネット検索が有効です",
-        "search_off": "モデルの知識のみを使用しています",
-    },
-}
-
-
-# ======================================================
-# 4. MODULES
-# ======================================================
-
 MODULES = {
-    "💜 Lidya": {
-        "en": "General Assistant",
-        "description": (
-            "Help with everyday questions, learning, "
-            "research, writing and programming."
-        ),
-    },
-    "📁 File Laboratory": {
-        "en": "File Laboratory",
-        "description": (
-            "Analyze supported images, PDFs, audio and videos."
-        ),
-    },
-    "🩺 Medical & Anatomy": {
-        "en": "Medical & Anatomy",
-        "description": (
-            "Explain anatomy and medical illustrations "
-            "for educational purposes."
-        ),
-    },
-    "⚖️ Legal Research": {
-        "en": "Legal Research",
-        "description": (
-            "Explain legal concepts and summarize documents."
-        ),
-    },
-    "🌍 Language Teacher": {
-        "en": "Language Teacher",
-        "description": (
-            "Practice languages, grammar, vocabulary and translation."
-        ),
-    },
-    "💻 Software Engineering": {
-        "en": "Software Engineering",
-        "description": (
-            "Programming, debugging and software design."
-        ),
-    },
-    "🔬 Science & Research": {
-        "en": "Science & Research",
-        "description": "Scientific concepts and research.",
-    },
-    "📐 Mathematics": {
-        "en": "Mathematics",
-        "description": "Mathematical explanations and problem-solving.",
-    },
-    "⚙️ Engineering": {
-        "en": "Engineering",
-        "description": "Engineering principles and calculations.",
-    },
-    "📚 Education": {
-        "en": "Education",
-        "description": "Learning materials and explanations.",
-    },
-    "📊 Business & Economics": {
-        "en": "Business & Economics",
-        "description": "Business, economics and data concepts.",
-    },
-    "✍️ Writing & Creativity": {
-        "en": "Writing & Creativity",
-        "description": "Writing, editing and brainstorming.",
-    },
-    "📈 Data Analysis": {
-        "en": "Data Analysis",
-        "description": "Data interpretation and analysis.",
-    },
-    "🔐 Cybersecurity": {
-        "en": "Cybersecurity",
-        "description": "Defensive security and secure coding.",
-    },
-    "🏠 Smart Devices": {
-        "en": "Smart Devices",
-        "description": "Plan safe smart-home integrations.",
-    },
-    "🎨 Image Studio": {
-        "en": "Image Studio",
-        "description": "Prepare image-generation prompts.",
-    },
-    "🎬 Video Studio": {
-        "en": "Video Studio",
-        "description": "Prepare video-generation prompts.",
-    },
+    "💜 Lidya": ("General Assistant", "Everyday questions, learning, research, writing and programming."),
+    "📁 File Laboratory": ("File Laboratory", "Help the user understand text they paste from documents. This version does not directly process uploaded files."),
+    "🩺 Medical & Anatomy": ("Medical & Anatomy", "Explain anatomy and medical concepts for education, not personal diagnosis or treatment."),
+    "⚖️ Legal Research": ("Legal Research", "Explain general legal concepts; ask which jurisdiction applies when relevant."),
+    "🌍 Language Teacher": ("Language Teacher", "Practice languages, grammar, vocabulary, writing and translation."),
+    "💻 Software Engineering": ("Software Engineering", "Programming, debugging, code review and software design."),
+    "🔬 Science & Research": ("Science & Research", "Explain scientific concepts, methods and uncertainty."),
+    "📐 Mathematics": ("Mathematics", "Solve math problems carefully and explain steps."),
+    "⚙️ Engineering": ("Engineering", "Explain engineering principles and calculations."),
+    "📚 Education": ("Education", "Create learning plans, explanations and study activities."),
+    "📊 Business & Economics": ("Business & Economics", "Explain business, economics and data concepts."),
+    "✍️ Writing & Creativity": ("Writing & Creativity", "Help brainstorm, write, revise and edit original text."),
+    "📈 Data Analysis": ("Data Analysis", "Help interpret data and explain analysis methods."),
+    "🔐 Cybersecurity": ("Cybersecurity", "Focus on defensive security, privacy and secure coding."),
+    "🏠 Smart Devices": ("Smart Devices", "Plan safe smart-home integrations; do not claim to control devices."),
+    "🎨 Image Studio": ("Image Studio", "Create detailed prompts for image-generation tools."),
+    "🎬 Video Studio": ("Video Studio", "Create detailed prompts for video-generation tools."),
 }
 
-
-MODULE_TRANSLATIONS = {
+MODULE_LABELS = {
     "Türkçe": {
-        "💜 Lidya": "💜 Lidya",
         "📁 File Laboratory": "📁 Dosya Laboratuvarı",
         "🩺 Medical & Anatomy": "🩺 Tıp ve Anatomi",
         "⚖️ Legal Research": "⚖️ Hukuk Araştırmaları",
@@ -358,839 +67,371 @@ MODULE_TRANSLATIONS = {
         "🏠 Smart Devices": "🏠 Akıllı Cihazlar",
         "🎨 Image Studio": "🎨 Görsel Atölyesi",
         "🎬 Video Studio": "🎬 Video Atölyesi",
+    }
+}
+
+TEXT = {
+    "Türkçe": {
+        "subtitle": "Düşün. Öğren. Üret. Keşfet.",
+        "language": "Arayüz ve yanıt dili",
+        "modules": "ÇALIŞMA ALANLARI",
+        "clear": "Sohbeti temizle",
+        "voice": "Yanıtı sesli oku",
+        "thinking": "Lidya düşünüyor...",
+        "chat": "Lidya'ya bir şey sor...",
+        "welcome": "Merhaba! Ben Lidya. Sana nasıl yardımcı olabilirim?",
+        "no_key": "GROQ_API_KEY bulunamadı. Streamlit Secrets ayarını kontrol et.",
+        "footer": "Merakla ve Python ile geliştirildi.",
+        "search_off": "Bu sürümde canlı internet araştırması henüz bağlı değil.",
+        "creative": "Ne oluşturmak istiyorsun?",
+        "prepare": "İstemi hazırla",
+        "file_note": "Bu sürüm dosyaları doğrudan analiz etmez. Belgeden metni kopyalayıp sohbete yapıştırabilirsin.",
+        "error": "Yanıt oluşturulamadı. API anahtarını, model erişimini ve kotanı kontrol et.",
     },
-    "English": {},
+    "English": {
+        "subtitle": "Think. Learn. Create. Discover.",
+        "language": "Interface and response language",
+        "modules": "WORKSPACES",
+        "clear": "Clear conversation",
+        "voice": "Read the answer aloud",
+        "thinking": "Lidya is thinking...",
+        "chat": "Ask Lidya anything...",
+        "welcome": "Hello! I'm Lidya. How can I help you?",
+        "no_key": "GROQ_API_KEY not found. Check Streamlit Secrets.",
+        "footer": "Built with curiosity and Python.",
+        "search_off": "Live web research is not connected in this version.",
+        "creative": "What would you like to create?",
+        "prepare": "Prepare prompt",
+        "file_note": "This version does not directly analyze uploaded files. Paste document text into the chat.",
+        "error": "Could not generate a response. Check your API key, model access and quota.",
+    },
     "Français": {
-        "💜 Lidya": "💜 Lidya",
-        "📁 File Laboratory": "📁 Laboratoire de fichiers",
-        "🩺 Medical & Anatomy": "🩺 Médecine et anatomie",
-        "⚖️ Legal Research": "⚖️ Recherche juridique",
-        "🌍 Language Teacher": "🌍 Professeur de langues",
-        "💻 Software Engineering": "💻 Développement logiciel",
-        "🔬 Science & Research": "🔬 Sciences et recherche",
-        "📐 Mathematics": "📐 Mathématiques",
-        "⚙️ Engineering": "⚙️ Ingénierie",
-        "📚 Education": "📚 Éducation",
-        "📊 Business & Economics": "📊 Économie et entreprise",
-        "✍️ Writing & Creativity": "✍️ Écriture et créativité",
-        "📈 Data Analysis": "📈 Analyse de données",
-        "🔐 Cybersecurity": "🔐 Cybersécurité",
-        "🏠 Smart Devices": "🏠 Appareils connectés",
-        "🎨 Image Studio": "🎨 Studio d'images",
-        "🎬 Video Studio": "🎬 Studio vidéo",
+        "subtitle": "Réfléchir. Apprendre. Créer. Découvrir.",
+        "language": "Langue de l'interface et des réponses",
+        "modules": "ESPACES DE TRAVAIL",
+        "clear": "Effacer la conversation",
+        "voice": "Lire la réponse à voix haute",
+        "thinking": "Lidya réfléchit...",
+        "chat": "Posez une question à Lidya...",
+        "welcome": "Bonjour ! Je suis Lidya. Comment puis-je vous aider ?",
+        "no_key": "GROQ_API_KEY introuvable. Vérifiez les Secrets.",
+        "footer": "Créé avec curiosité et Python.",
+        "search_off": "La recherche Web en direct n'est pas connectée dans cette version.",
+        "creative": "Que souhaitez-vous créer ?",
+        "prepare": "Préparer le prompt",
+        "file_note": "Cette version n'analyse pas directement les fichiers. Collez le texte du document dans le chat.",
+        "error": "Impossible de générer une réponse. Vérifiez la clé API, le modèle et le quota.",
     },
     "Deutsch": {
-        "💜 Lidya": "💜 Lidya",
-        "📁 File Laboratory": "📁 Dateilabor",
-        "🩺 Medical & Anatomy": "🩺 Medizin und Anatomie",
-        "⚖️ Legal Research": "⚖️ Rechtsrecherche",
-        "🌍 Language Teacher": "🌍 Sprachlehrer",
-        "💻 Software Engineering": "💻 Softwareentwicklung",
-        "🔬 Science & Research": "🔬 Wissenschaft und Forschung",
-        "📐 Mathematics": "📐 Mathematik",
-        "⚙️ Engineering": "⚙️ Ingenieurwesen",
-        "📚 Education": "📚 Bildung",
-        "📊 Business & Economics": "📊 Wirtschaft",
-        "✍️ Writing & Creativity": "✍️ Schreiben und Kreativität",
-        "📈 Data Analysis": "📈 Datenanalyse",
-        "🔐 Cybersecurity": "🔐 Cybersicherheit",
-        "🏠 Smart Devices": "🏠 Smart-Geräte",
-        "🎨 Image Studio": "🎨 Bildstudio",
-        "🎬 Video Studio": "🎬 Videostudio",
+        "subtitle": "Denken. Lernen. Gestalten. Entdecken.",
+        "language": "Sprache der Oberfläche und Antworten",
+        "modules": "ARBEITSBEREICHE",
+        "clear": "Unterhaltung löschen",
+        "voice": "Antwort vorlesen",
+        "thinking": "Lidya denkt nach...",
+        "chat": "Frage Lidya etwas...",
+        "welcome": "Hallo! Ich bin Lidya. Wie kann ich dir helfen?",
+        "no_key": "GROQ_API_KEY fehlt. Überprüfe die Streamlit-Secrets.",
+        "footer": "Mit Neugier und Python entwickelt.",
+        "search_off": "Live-Websuche ist in dieser Version nicht verbunden.",
+        "creative": "Was möchtest du erstellen?",
+        "prepare": "Prompt vorbereiten",
+        "file_note": "Diese Version analysiert keine Dateien direkt. Füge den Dokumenttext in den Chat ein.",
+        "error": "Antwort konnte nicht erstellt werden. Prüfe API-Schlüssel, Modellzugriff und Kontingent.",
     },
     "Español": {
-        "💜 Lidya": "💜 Lidya",
-        "📁 File Laboratory": "📁 Laboratorio de archivos",
-        "🩺 Medical & Anatomy": "🩺 Medicina y anatomía",
-        "⚖️ Legal Research": "⚖️ Investigación jurídica",
-        "🌍 Language Teacher": "🌍 Profesor de idiomas",
-        "💻 Software Engineering": "💻 Ingeniería de software",
-        "🔬 Science & Research": "🔬 Ciencia e investigación",
-        "📐 Mathematics": "📐 Matemáticas",
-        "⚙️ Engineering": "⚙️ Ingeniería",
-        "📚 Education": "📚 Educación",
-        "📊 Business & Economics": "📊 Negocios y economía",
-        "✍️ Writing & Creativity": "✍️ Escritura y creatividad",
-        "📈 Data Analysis": "📈 Análisis de datos",
-        "🔐 Cybersecurity": "🔐 Ciberseguridad",
-        "🏠 Smart Devices": "🏠 Dispositivos inteligentes",
-        "🎨 Image Studio": "🎨 Estudio de imágenes",
-        "🎬 Video Studio": "🎬 Estudio de vídeo",
+        "subtitle": "Piensa. Aprende. Crea. Descubre.",
+        "language": "Idioma de la interfaz y las respuestas",
+        "modules": "ESPACIOS DE TRABAJO",
+        "clear": "Borrar conversación",
+        "voice": "Leer la respuesta en voz alta",
+        "thinking": "Lidya está pensando...",
+        "chat": "Pregúntale algo a Lidya...",
+        "welcome": "¡Hola! Soy Lidya. ¿Cómo puedo ayudarte?",
+        "no_key": "No se encontró GROQ_API_KEY. Revisa los Secrets.",
+        "footer": "Creado con curiosidad y Python.",
+        "search_off": "La búsqueda web en directo no está conectada en esta versión.",
+        "creative": "¿Qué quieres crear?",
+        "prepare": "Preparar instrucciones",
+        "file_note": "Esta versión no analiza archivos directamente. Pega el texto del documento en el chat.",
+        "error": "No se pudo generar una respuesta. Revisa la clave API, el modelo y la cuota.",
     },
     "Italiano": {
-        "💜 Lidya": "💜 Lidya",
-        "📁 File Laboratory": "📁 Laboratorio file",
-        "🩺 Medical & Anatomy": "🩺 Medicina e anatomia",
-        "⚖️ Legal Research": "⚖️ Ricerca legale",
-        "🌍 Language Teacher": "🌍 Insegnante di lingue",
-        "💻 Software Engineering": "💻 Ingegneria del software",
-        "🔬 Science & Research": "🔬 Scienza e ricerca",
-        "📐 Mathematics": "📐 Matematica",
-        "⚙️ Engineering": "⚙️ Ingegneria",
-        "📚 Education": "📚 Istruzione",
-        "📊 Business & Economics": "📊 Economia e impresa",
-        "✍️ Writing & Creativity": "✍️ Scrittura e creatività",
-        "📈 Data Analysis": "📈 Analisi dei dati",
-        "🔐 Cybersecurity": "🔐 Sicurezza informatica",
-        "🏠 Smart Devices": "🏠 Dispositivi intelligenti",
-        "🎨 Image Studio": "🎨 Studio immagini",
-        "🎬 Video Studio": "🎬 Studio video",
+        "subtitle": "Pensa. Impara. Crea. Scopri.",
+        "language": "Lingua dell'interfaccia e delle risposte",
+        "modules": "SPAZI DI LAVORO",
+        "clear": "Cancella conversazione",
+        "voice": "Leggi la risposta ad alta voce",
+        "thinking": "Lidya sta pensando...",
+        "chat": "Chiedi qualcosa a Lidya...",
+        "welcome": "Ciao! Sono Lidya. Come posso aiutarti?",
+        "no_key": "GROQ_API_KEY mancante. Controlla i Secrets.",
+        "footer": "Creato con curiosità e Python.",
+        "search_off": "La ricerca web in tempo reale non è collegata in questa versione.",
+        "creative": "Che cosa vuoi creare?",
+        "prepare": "Prepara il prompt",
+        "file_note": "Questa versione non analizza direttamente i file. Incolla il testo nel chat.",
+        "error": "Impossibile generare una risposta. Controlla chiave API, modello e quota.",
     },
     "日本語": {
-        "💜 Lidya": "💜 Lidya",
-        "📁 File Laboratory": "📁 ファイル分析",
-        "🩺 Medical & Anatomy": "🩺 医学・解剖学",
-        "⚖️ Legal Research": "⚖️ 法律調査",
-        "🌍 Language Teacher": "🌍 語学学習",
-        "💻 Software Engineering": "💻 ソフトウェア開発",
-        "🔬 Science & Research": "🔬 科学・研究",
-        "📐 Mathematics": "📐 数学",
-        "⚙️ Engineering": "⚙️ 工学",
-        "📚 Education": "📚 教育",
-        "📊 Business & Economics": "📊 ビジネス・経済",
-        "✍️ Writing & Creativity": "✍️ 文章・創作",
-        "📈 Data Analysis": "📈 データ分析",
-        "🔐 Cybersecurity": "🔐 サイバーセキュリティ",
-        "🏠 Smart Devices": "🏠 スマートデバイス",
-        "🎨 Image Studio": "🎨 画像スタジオ",
-        "🎬 Video Studio": "🎬 動画スタジオ",
+        "subtitle": "考える。学ぶ。創造する。発見する。",
+        "language": "画面と言語",
+        "modules": "ワークスペース",
+        "clear": "会話を消去",
+        "voice": "回答を読み上げる",
+        "thinking": "Lidyaが考えています...",
+        "chat": "Lidyaに質問する...",
+        "welcome": "こんにちは！Lidyaです。どのようにお手伝いできますか？",
+        "no_key": "GROQ_API_KEYが見つかりません。Secretsを確認してください。",
+        "footer": "好奇心とPythonで開発。",
+        "search_off": "このバージョンではライブWeb検索は接続されていません。",
+        "creative": "何を作成しますか？",
+        "prepare": "プロンプトを準備",
+        "file_note": "このバージョンはファイルを直接分析しません。文書のテキストをチャットに貼り付けてください。",
+        "error": "回答を生成できませんでした。APIキー、モデル、利用制限を確認してください。",
     },
 }
 
-
 # ======================================================
-# 5. API CLIENT
+# 3. API CLIENT
 # ======================================================
-
 def get_api_key():
     try:
-        return st.secrets.get("GEMINI_API_KEY", "")
+        key = st.secrets.get("GROQ_API_KEY", "")
+        if key:
+            return key
     except Exception:
-        return os.environ.get("GEMINI_API_KEY", "")
-
+        pass
+    return os.environ.get("GROQ_API_KEY", "")
 
 @st.cache_resource
 def get_client(api_key):
-    return genai.Client(
-        api_key=api_key,
-        http_options=types.HttpOptions(
-            timeout=60000,
-        ),
-    )
-
+    return Groq(api_key=api_key, timeout=60.0, max_retries=1)
 
 API_KEY = get_api_key()
 client = get_client(API_KEY) if API_KEY else None
 
+# ======================================================
+# 4. VISUAL DESIGN
+# ======================================================
+st.markdown("""
+<style>
+.stApp {
+    background: radial-gradient(circle at top, #30204f 0%, #141326 48%, #090914 100%);
+    color: #f4efff;
+}
+[data-testid="stSidebar"] {
+    background: #111020;
+    border-right: 1px solid #3b2b59;
+}
+.lidya-title {
+    font-size: clamp(34px, 6vw, 48px);
+    font-weight: 900;
+    letter-spacing: 4px;
+    text-align: center;
+    background: linear-gradient(90deg, #f6d7ff, #bb9aff, #83e8ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.lidya-subtitle { text-align: center; color: #d3c8f5; font-size: 16px; }
+.orb {
+    width: 100px; height: 100px; margin: 20px auto; border-radius: 50%;
+    background: radial-gradient(circle at 30% 25%, #fff, #d5a8ff 15%, #8c54ed 40%, #402078 70%, #161126 100%);
+    box-shadow: 0 0 25px #b77cff, 0 0 60px #8255ff;
+    animation: float 3s ease-in-out infinite;
+}
+@keyframes float { 0%,100% {transform:translateY(0)} 50% {transform:translateY(-8px)} }
+[data-testid="stChatMessage"] {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(200,170,255,0.17);
+    border-radius: 15px;
+}
+footer { visibility: hidden; }
+</style>
+""", unsafe_allow_html=True)
 
 # ======================================================
-# 6. VISUAL DESIGN
+# 5. SYSTEM INSTRUCTIONS
 # ======================================================
-
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background:
-            radial-gradient(
-                circle at top,
-                #30204f 0%,
-                #141326 48%,
-                #090914 100%
-            );
-        color: #f4efff;
-    }
-
-    [data-testid="stSidebar"] {
-        background: #111020;
-        border-right: 1px solid #3b2b59;
-    }
-
-    .lidya-title {
-        font-size: 48px;
-        font-weight: 900;
-        letter-spacing: 4px;
-        text-align: center;
-        background: linear-gradient(
-            90deg,
-            #f6d7ff,
-            #bb9aff,
-            #83e8ff
-        );
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    .lidya-subtitle {
-        text-align: center;
-        color: #d3c8f5;
-        font-size: 16px;
-    }
-
-    .orb {
-        width: 110px;
-        height: 110px;
-        margin: 20px auto;
-        border-radius: 50%;
-        background: radial-gradient(
-            circle at 30% 25%,
-            #ffffff,
-            #d5a8ff 15%,
-            #8c54ed 40%,
-            #402078 70%,
-            #161126 100%
-        );
-        box-shadow:
-            0 0 25px #b77cff,
-            0 0 60px #8255ff;
-        animation: float 3s ease-in-out infinite;
-    }
-
-    @keyframes float {
-        0%, 100% {
-            transform: translateY(0);
-        }
-        50% {
-            transform: translateY(-10px);
-        }
-    }
-
-    [data-testid="stChatMessage"] {
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(200,170,255,0.17);
-        border-radius: 15px;
-    }
-
-    footer {
-        visibility: hidden;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-# ======================================================
-# 7. SYSTEM INSTRUCTIONS
-# ======================================================
-
 def build_system_instruction(module, language):
-
-    module_info = MODULES[module]
-
+    module_name, module_description = MODULES[module]
     return f"""
-You are Lidya AI, a helpful, careful and accurate AI assistant.
+You are Lidya AI, a thoughtful, accurate and helpful assistant.
+Current workspace: {module_name}
+Workspace purpose: {module_description}
+Respond in {LANGUAGES[language]} unless the user asks for another language.
 
-Current workspace: {module_info["en"]}
-Workspace purpose: {module_info["description"]}
-
-Respond in {LANGUAGES[language]} unless the user asks
-for a different language.
-
-RESEARCH:
-When internet research is enabled and the question requires
-current or externally verifiable information, use Google Search.
-Explain the evidence, distinguish facts from uncertainty, and
-use the actual sources returned by the search tool.
-Never invent citations, URLs, quotations or search results.
-If reliable evidence is insufficient, say so.
+QUALITY:
+- Understand the question and use relevant conversation context.
+- Give accurate, well-structured answers.
+- Explain complex topics step by step, but keep simple answers concise.
+- For math, check calculations and show the method.
+- For programming, give runnable code when possible and explain important parts.
+- Never invent facts, citations, URLs, quotes, or actions you did not perform.
+- State uncertainty clearly and correct mistakes when noticed.
+- Do not claim to have searched the live internet in this version.
+- Do not ask for passwords, API keys, or unnecessary sensitive information.
 
 MEDICAL:
-Provide educational information, not definitive personal
-diagnoses or treatment decisions. For medical illustrations,
-describe visible structures and flag uncertain identifications.
-Important clinical decisions must be checked by qualified
-healthcare professionals.
+Provide educational information only, not a definitive personal diagnosis or treatment plan.
+Encourage qualified medical care for important health decisions.
 
 LEGAL:
-Provide general legal information. Ask which jurisdiction
-applies when relevant. Do not claim to be the user's lawyer.
-
-PRIVACY:
-Do not request passwords, API keys or unnecessary sensitive
-information. Avoid uploading identifiable patient information.
+Provide general legal information, not legal representation. Ask which jurisdiction applies when relevant.
 
 SMART DEVICES:
-This app cannot directly control physical devices.
-Never claim to have activated or changed a device.
-
-Be transparent about limitations and uncertainty.
+This app does not directly control physical devices. Never claim a device was activated or changed.
 """
 
-
 # ======================================================
-# 8. FILE HANDLING
+# 6. SESSION STATE
 # ======================================================
-
-def prepare_file(uploaded_file):
-
-    if uploaded_file is None:
-        return None
-
-    file_bytes = uploaded_file.getvalue()
-
-    if len(file_bytes) > MAX_FILE_SIZE_MB * 1024 * 1024:
-        raise ValueError(
-            f"File is larger than {MAX_FILE_SIZE_MB} MB."
-        )
-
-    mime_type = (
-        uploaded_file.type
-        or "application/octet-stream"
-    )
-
-    # Images: send directly as image parts.
-    if mime_type.startswith("image/"):
-        return types.Part.from_bytes(
-            data=file_bytes,
-            mime_type=mime_type,
-        )
-
-    # Documents, audio and video: upload to the Files API.
-    supported = (
-        mime_type == "application/pdf"
-        or mime_type.startswith("audio/")
-        or mime_type.startswith("video/")
-    )
-
-    if not supported:
-        raise ValueError(
-            "Unsupported file type. Use an image, PDF, "
-            "audio file or video file."
-        )
-
-    suffix = os.path.splitext(
-        uploaded_file.name
-    )[1]
-
-    temp_path = None
-
-    try:
-        with tempfile.NamedTemporaryFile(
-            delete=False,
-            suffix=suffix,
-        ) as temp_file:
-            temp_file.write(file_bytes)
-            temp_path = temp_file.name
-
-        remote_file = client.files.upload(
-            file=temp_path
-        )
-
-        # Wait briefly for processing when required.
-        for _ in range(15):
-            state = getattr(
-                remote_file,
-                "state",
-                None,
-            )
-
-            state_name = getattr(
-                state,
-                "name",
-                str(state or ""),
-            )
-
-            if state_name in ("ACTIVE", "None", ""):
-                break
-
-            if state_name == "FAILED":
-                raise RuntimeError(
-                    "The uploaded file could not be processed."
-                )
-
-            time.sleep(2)
-
-            remote_file = client.files.get(
-                name=remote_file.name
-            )
-
-        return remote_file
-
-    finally:
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
-
-
-# ======================================================
-# 9. GOOGLE SEARCH + CHAT
-# ======================================================
-
-def ask_lidya(
-    prompt,
-    module,
-    language,
-    history,
-    uploaded_file=None,
-    internet_search=True,
-):
-
-    if client is None:
-        raise RuntimeError(
-            "GEMINI_API_KEY is missing. Add it in "
-            "Streamlit Cloud → Settings → Secrets."
-        )
-
-    instruction = build_system_instruction(
-        module,
-        language,
-    )
-
-    # Keep the latest messages to limit response time.
-    recent_history = history[-8:]
-
-    history_text = "\n\n".join(
-        (
-            "User: "
-            if item["role"] == "user"
-            else "Lidya: "
-        )
-        + item["content"]
-        for item in recent_history
-    )
-
-    parts = [
-        types.Part.from_text(
-            text=(
-                f"Recent conversation:\n{history_text}\n\n"
-                f"Current message:\n{prompt}"
-            )
-        )
-    ]
-
-    if uploaded_file is not None:
-        file_part = prepare_file(uploaded_file)
-
-        if isinstance(file_part, types.Part):
-            parts.append(file_part)
-
-        elif file_part is not None:
-            parts.append(
-                types.Part.from_uri(
-                    file_uri=file_part.uri,
-                    mime_type=file_part.mime_type,
-                )
-            )
-
-    tools = []
-
-    if internet_search:
-        tools.append(
-            types.Tool(
-                google_search=types.GoogleSearch()
-            )
-        )
-
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=[
-            types.Content(
-                role="user",
-                parts=parts,
-            )
-        ],
-        config=types.GenerateContentConfig(
-            system_instruction=instruction,
-            tools=tools if tools else None,
-            temperature=0.4,
-            max_output_tokens=1800,
-        ),
-    )
-
-    answer = getattr(response, "text", None)
-
-    if not answer:
-        raise RuntimeError(
-            "The model returned no text. Check model access "
-            "and the API response."
-        )
-
-    sources = []
-
-    # Collect actual URLs from Google Search grounding metadata.
-    try:
-        candidates = getattr(
-            response,
-            "candidates",
-            [],
-        )
-
-        if candidates:
-            metadata = getattr(
-                candidates[0],
-                "grounding_metadata",
-                None,
-            )
-
-            chunks = getattr(
-                metadata,
-                "grounding_chunks",
-                [],
-            ) if metadata else []
-
-            for chunk in chunks:
-                web_info = getattr(
-                    chunk,
-                    "web",
-                    None,
-                )
-
-                if not web_info:
-                    continue
-
-                uri = getattr(
-                    web_info,
-                    "uri",
-                    None,
-                )
-
-                title = getattr(
-                    web_info,
-                    "title",
-                    None,
-                )
-
-                if uri and uri.startswith("https://"):
-                    item = (title or uri, uri)
-
-                    if item not in sources:
-                        sources.append(item)
-
-    except Exception:
-        # Do not break the answer if source metadata is absent.
-        sources = []
-
-    return answer, sources
-
-
-# ======================================================
-# 10. SESSION STATE
-# ======================================================
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 if "last_answer" not in st.session_state:
     st.session_state.last_answer = ""
 
-if "last_sources" not in st.session_state:
-    st.session_state.last_sources = []
-
-
 # ======================================================
-# 11. SIDEBAR AND LANGUAGE
+# 7. SIDEBAR
 # ======================================================
-
 with st.sidebar:
-
     st.markdown("## 💜 Lidya AI")
-
     language = st.selectbox(
         "🌍 Language / Dil",
         list(LANGUAGES.keys()),
         key="interface_language",
     )
-
-    ui = TRANSLATIONS[language]
-
+    ui = TEXT[language]
     st.markdown(f"### {ui['modules']}")
 
     module_keys = list(MODULES.keys())
-
     module_labels = [
-        MODULE_TRANSLATIONS.get(language, {}).get(
-            key,
-            key,
-        )
+        MODULE_LABELS.get(language, {}).get(key, key)
         for key in module_keys
     ]
-
     selected_label = st.radio(
         ui["modules"],
         module_labels,
         label_visibility="collapsed",
     )
+    selected_module = module_keys[module_labels.index(selected_label)]
 
-    selected_module = module_keys[
-        module_labels.index(selected_label)
-    ]
+    st.caption("🌐 " + ui["search_off"])
+    voice_output = st.checkbox(ui["voice"], value=False)
 
-    internet_search = st.toggle(
-        ui["search_toggle"],
-        value=True,
-    )
-
-    if internet_search:
-        st.caption("🌐 " + ui["search_on"])
-    else:
-        st.caption("📚 " + ui["search_off"])
-
-    voice_output = st.checkbox(
-        ui["voice"],
-        value=False,
-    )
-
-    if st.button(
-        ui["clear"],
-        use_container_width=True,
-    ):
+    if st.button(ui["clear"], use_container_width=True):
         st.session_state.messages = []
         st.session_state.last_answer = ""
-        st.session_state.last_sources = []
         st.rerun()
 
     st.divider()
-
-    st.caption(
-        "💜 Lidya AI"
-    )
-
+    st.caption("💜 Lidya AI")
 
 # ======================================================
-# 12. MAIN HEADER
+# 8. HEADER
 # ======================================================
+st.markdown('<div class="lidya-title">LIDYA AI</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="lidya-subtitle">{ui["subtitle"]}</div>', unsafe_allow_html=True)
+st.markdown('<div class="orb"></div>', unsafe_allow_html=True)
+st.subheader(MODULE_LABELS.get(language, {}).get(selected_module, selected_module))
+st.caption(MODULES[selected_module][1])
 
-st.markdown(
-    '<div class="lidya-title">LIDYA AI</div>',
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    f'<div class="lidya-subtitle">{ui["subtitle"]}</div>',
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    '<div class="orb"></div>',
-    unsafe_allow_html=True,
-)
-
-st.subheader(
-    MODULE_TRANSLATIONS.get(language, {}).get(
-        selected_module,
-        selected_module,
-    )
-)
-
-st.caption(
-    MODULES[selected_module]["description"]
-)
-
-
-# ======================================================
-# 13. SPECIAL MODULE MESSAGES
-# ======================================================
-
+if selected_module == "📁 File Laboratory":
+    st.info(ui["file_note"])
 if selected_module == "🩺 Medical & Anatomy":
-    st.info(ui["medical_notice"])
+    st.info("Eğitim amaçlıdır; tanı veya tedavi kararlarının yerini tutmaz." if language == "Türkçe"
+            else "For education only; not a substitute for diagnosis or treatment.")
 
-if selected_module == "⚖️ Legal Research":
-    st.info(ui["legal_notice"])
-
-if selected_module == "🏠 Smart Devices":
-    st.info(ui["smart_notice"])
-
-
-# ======================================================
-# 14. IMAGE AND VIDEO PROMPT WORKSPACES
-# ======================================================
-
-if selected_module in (
-    "🎨 Image Studio",
-    "🎬 Video Studio",
-):
-
-    if selected_module == "🎨 Image Studio":
-        st.info(ui["image_notice"])
-    else:
-        st.info(ui["video_notice"])
-
-    creative_prompt = st.text_area(
-        ui["prompt_label"],
-        height=150,
-    )
-
+# Creative workspaces prepare prompts only.
+if selected_module in ("🎨 Image Studio", "🎬 Video Studio"):
+    creative_prompt = st.text_area(ui["creative"], height=150)
     if st.button(ui["prepare"]):
         if creative_prompt.strip():
-            st.code(
-                creative_prompt.strip(),
-                language=None,
-            )
+            st.code(creative_prompt.strip(), language=None)
         else:
-            st.warning(
-                ui["prompt_label"]
-            )
-
+            st.warning(ui["creative"])
 
 # ======================================================
-# 15. FILE UPLOAD
+# 9. CHAT HISTORY
 # ======================================================
-
-uploaded_file = None
-
-if selected_module in (
-    "📁 File Laboratory",
-    "🩺 Medical & Anatomy",
-):
-
-    uploaded_file = st.file_uploader(
-        ui["upload"],
-        type=[
-            "png",
-            "jpg",
-            "jpeg",
-            "webp",
-            "gif",
-            "pdf",
-            "mp4",
-            "mov",
-            "mp3",
-            "wav",
-            "m4a",
-        ],
-    )
-
-    if uploaded_file:
-
-        st.caption(
-            f"{ui['file_selected']}: {uploaded_file.name}"
-        )
-
-        mime = uploaded_file.type or ""
-
-        if mime.startswith("image/"):
-            st.image(
-                uploaded_file,
-                use_container_width=True,
-            )
-
-        elif mime.startswith("video/"):
-            st.video(uploaded_file)
-
-
-# ======================================================
-# 16. CHAT HISTORY
-# ======================================================
+if not st.session_state.messages:
+    with st.chat_message("assistant", avatar="💜"):
+        st.markdown(ui["welcome"])
 
 for message in st.session_state.messages:
-
     with st.chat_message(
         message["role"],
-        avatar=(
-            "💜"
-            if message["role"] == "assistant"
-            else "🧑‍💻"
-        ),
+        avatar="💜" if message["role"] == "assistant" else "🧑‍💻",
     ):
         st.markdown(message["content"])
 
-
 # ======================================================
-# 17. CHAT INPUT
+# 10. CHAT
 # ======================================================
-
-if selected_module not in (
-    "🎨 Image Studio",
-    "🎬 Video Studio",
-):
-
-    prompt = st.chat_input(
-        ui["chat"]
-    )
+if selected_module not in ("🎨 Image Studio", "🎬 Video Studio"):
+    prompt = st.chat_input(ui["chat"])
 
     if prompt:
+        previous_history = list(st.session_state.messages)
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-        previous_history = list(
-            st.session_state.messages
-        )
-
-        st.session_state.messages.append(
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        )
-
-        with st.chat_message(
-            "user",
-            avatar="🧑‍💻",
-        ):
+        with st.chat_message("user", avatar="🧑‍💻"):
             st.markdown(prompt)
 
-        with st.chat_message(
-            "assistant",
-            avatar="💜",
-        ):
+        with st.chat_message("assistant", avatar="💜"):
+            if client is None:
+                st.error(ui["no_key"])
+            else:
+                try:
+                    with st.spinner(ui["thinking"]):
+                        api_messages = [
+                            {
+                                "role": "system",
+                                "content": build_system_instruction(selected_module, language),
+                            }
+                        ]
 
-            status = st.empty()
+                        # Include recent messages for conversational context.
+                        for item in previous_history[-8:]:
+                            if item.get("role") in ("user", "assistant"):
+                                api_messages.append({
+                                    "role": item["role"],
+                                    "content": item["content"],
+                                })
 
-            try:
+                        api_messages.append({"role": "user", "content": prompt})
 
-                status.info(
-                    "💜 " + ui["thinking"]
-                )
+                        completion = client.chat.completions.create(
+                            model=MODEL_NAME,
+                            messages=api_messages,
+                            temperature=0.4,
+                            max_completion_tokens=1800,
+                        )
 
-                with st.spinner(
-                    ui["thinking"]
-                ):
+                        answer = completion.choices[0].message.content
+                        if not answer:
+                            raise RuntimeError("Model boş yanıt döndürdü.")
 
-                    answer, sources = ask_lidya(
-                        prompt=prompt,
-                        module=selected_module,
-                        language=language,
-                        history=previous_history,
-                        uploaded_file=uploaded_file,
-                        internet_search=internet_search,
-                    )
-
-                status.empty()
-
-                st.markdown(answer)
-
-                if sources:
-                    with st.expander(ui["sources"]):
-                        for title, url in sources:
-                            st.markdown(
-                                f"- [{title}]({url})"
-                            )
-
-                st.session_state.last_answer = answer
-                st.session_state.last_sources = sources
-
-                st.session_state.messages.append(
-                    {
+                    st.markdown(answer)
+                    st.session_state.last_answer = answer
+                    st.session_state.messages.append({
                         "role": "assistant",
                         "content": answer,
-                    }
-                )
+                    })
 
-            except Exception as error:
-
-                status.error(
-                    ui["chat_error"]
-                )
-
-                st.error(
-                    f"{type(error).__name__}: {error}"
-                )
-
-                st.info(
-                    "Check your API key, model access, "
-                    "internet connection and file format."
-                )
-
+                except Exception as error:
+                    st.error(ui["error"])
+                    st.caption(f"{type(error).__name__}: {error}")
+                    st.info(
+                        "Groq Console'da seçilen modelin erişilebilir olduğunu ve "
+                        "ücretsiz kullanım kotasının dolmadığını kontrol et. "
+                        "API anahtarını hata mesajıyla birlikte paylaşma."
+                    )
 
 # ======================================================
-# 18. TEXT-TO-SPEECH
+# 11. TEXT-TO-SPEECH
 # ======================================================
-
-if (
-    voice_output
-    and st.session_state.last_answer
-):
-
-    speech_text = st.session_state.last_answer
-
+if voice_output and st.session_state.last_answer:
     speech_language = {
         "Türkçe": "tr-TR",
         "English": "en-US",
@@ -1201,23 +442,14 @@ if (
         "日本語": "ja-JP",
     }[language]
 
-    import json
-
-    safe_text = json.dumps(
-        speech_text,
-        ensure_ascii=False,
-    )
-
+    safe_text = json.dumps(st.session_state.last_answer, ensure_ascii=False)
     components.html(
         f"""
         <script>
         const text = {safe_text};
-        const utterance =
-            new SpeechSynthesisUtterance(text);
-
+        const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "{speech_language}";
         utterance.rate = 1.0;
-
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utterance);
         </script>
@@ -1225,21 +457,11 @@ if (
         height=0,
     )
 
-
 # ======================================================
-# 19. FOOTER
+# 12. FOOTER
 # ======================================================
-
 st.markdown(
-    f"""
-    <div style="
-        text-align:center;
-        color:#b9a9dc;
-        padding:30px 0 10px 0;
-        font-size:13px;
-    ">
-        💜 Lidya AI · {ui["footer"]}
-    </div>
-    """,
+    f'<div style="text-align:center;color:#b9a9dc;padding:30px 0 10px;font-size:13px;">'
+    f'💜 Lidya AI · {ui["footer"]}</div>',
     unsafe_allow_html=True,
 )
