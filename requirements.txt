@@ -1,2 +1,6 @@
 streamlit
 groq
+pypdf
+python-docx
+huggingface_hub
+fal-client
