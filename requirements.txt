@@ -1,6 +1,9 @@
-streamlit
-groq
-pypdf
-python-docx
-huggingface_hub
-fal-client
+streamlit>=1.40.0
+groq>=1.0.0
+pypdf>=5.0.0
+python-docx>=1.1.0
+requests>=2.31.0
+Pillow>=10.0.0
+numpy>=1.26.0
+imageio>=2.34.0
+imageio-ffmpeg>=0.5.1
