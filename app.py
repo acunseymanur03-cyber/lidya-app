@@ -254,6 +254,7 @@ st.markdown("""
     -webkit-text-fill-color: transparent;
 }
 .lidya-subtitle { text-align: center; color: #d3c8f5; font-size: 16px; }
+.lab-banner { border: 1px solid rgba(203,174,255,.24); border-radius: 18px; padding: 14px 18px; margin: 8px 0 18px; background: linear-gradient(120deg,rgba(139,84,237,.16),rgba(93,208,255,.07)); }
 .orb {
     width: 100px; height: 100px; margin: 20px auto; border-radius: 50%;
     background: radial-gradient(circle at 30% 25%, #fff, #d5a8ff 15%, #8c54ed 40%, #402078 70%, #161126 100%);
@@ -518,49 +519,78 @@ with st.sidebar:
 st.markdown('<div class="lidya-title">LIDYA AI</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="lidya-subtitle">{ui["subtitle"]}</div>', unsafe_allow_html=True)
 st.markdown('<div class="orb"></div>', unsafe_allow_html=True)
+if selected_module in MODULES:
+    module_title, module_description = MODULES[selected_module]
+    st.markdown(f'<div class="lab-banner"><strong>{module_title}</strong><br><span style="opacity:.88">{module_description}</span></div>', unsafe_allow_html=True)
 
 def render_module_simulation(module):
     """Small, interactive educational lab tailored to the active workspace."""
-    if module in ("🎓 University & Admissions",):
+    if module == "🎓 University & Admissions":
         st.markdown("### 🎓 Üniversite keşif laboratuvarı")
-        st.caption("Logoları, resmî üniversite sayfalarını ve başvuru hedeflerini aynı yerde keşfet.")
+        st.caption("Üniversite keşfet, karşılaştır, hedef listene ekle ve başvuru yol haritanı oluştur.")
         universities = {
-            "Harvard University": ("harvard.edu", "https://www.harvard.edu/", "Lisans eğitimi, araştırma ve need-based financial aid"),
-            "University of Oxford": ("ox.ac.uk", "https://www.ox.ac.uk/", "Bölüm bazlı kabul koşulları ve tutorial sistemi"),
-            "Stanford University": ("stanford.edu", "https://www.stanford.edu/", "Araştırma, girişimcilik ve disiplinler arası çalışma"),
-            "Columbia University": ("columbia.edu", "https://www.columbia.edu/", "Core Curriculum ve New York'ta kampüs yaşamı"),
-            "MIT": ("mit.edu", "https://www.mit.edu/", "STEM, tasarım ve uygulamalı araştırma"),
-            "Yale University": ("yale.edu", "https://www.yale.edu/", "Liberal arts, kolej sistemi ve araştırma"),
-            "Princeton University": ("princeton.edu", "https://www.princeton.edu/", "Lisans araştırmaları ve tez odaklı eğitim"),
-            "University of Cambridge": ("cam.ac.uk", "https://www.cam.ac.uk/", "Kolej sistemi ve bölüm bazlı akademik eğitim"),
+            "Harvard University": {"domain":"harvard.edu", "url":"https://www.harvard.edu/", "aid":"Need-based financial aid", "focus":"Lisans eğitimi, araştırma ve disiplinler arası çalışma", "region":"ABD"},
+            "University of Oxford": {"domain":"ox.ac.uk", "url":"https://www.ox.ac.uk/", "aid":"Burslar ve finansman seçenekleri değişken", "focus":"Bölüm bazlı kabul koşulları ve tutorial sistemi", "region":"Birleşik Krallık"},
+            "Stanford University": {"domain":"stanford.edu", "url":"https://www.stanford.edu/", "aid":"Need-based aid politikası kontrol edilmeli", "focus":"Araştırma, girişimcilik ve disiplinler arası çalışma", "region":"ABD"},
+            "Columbia University": {"domain":"columbia.edu", "url":"https://www.columbia.edu/", "aid":"Uluslararası başvuru sahibi koşullarını kontrol et", "focus":"Core Curriculum ve New York'ta kampüs yaşamı", "region":"ABD"},
+            "MIT": {"domain":"mit.edu", "url":"https://www.mit.edu/", "aid":"Resmî öğrenci finansmanı sayfasını kontrol et", "focus":"STEM, tasarım ve uygulamalı araştırma", "region":"ABD"},
+            "Yale University": {"domain":"yale.edu", "url":"https://www.yale.edu/", "aid":"Need-based aid politikası kontrol edilmeli", "focus":"Liberal arts, kolej sistemi ve araştırma", "region":"ABD"},
+            "Princeton University": {"domain":"princeton.edu", "url":"https://www.princeton.edu/", "aid":"Resmî finansal yardım politikasını kontrol et", "focus":"Lisans araştırmaları ve tez odaklı eğitim", "region":"ABD"},
+            "University of Cambridge": {"domain":"cam.ac.uk", "url":"https://www.cam.ac.uk/", "aid":"Uluslararası burslar sınırlı ve programa bağlı olabilir", "focus":"Kolej sistemi ve bölüm bazlı akademik eğitim", "region":"Birleşik Krallık"},
         }
-        chosen = st.selectbox("Bir üniversite seç", list(universities.keys()), key="uni_lab_choice")
-        domain, official_url, description = universities[chosen]
+        if "uni_shortlist" not in st.session_state:
+            st.session_state.uni_shortlist = []
+        chosen = st.selectbox("Üniversiteyi keşfet", list(universities.keys()), key="uni_lab_choice")
+        info = universities[chosen]
         col_logo, col_info = st.columns([1, 2])
         with col_logo:
-            try:
-                st.image(f"https://logo.clearbit.com/{domain}?size=256", caption=f"{chosen} logosu", use_container_width=True)
-            except Exception:
-                st.markdown(f"<div style='font-size:64px;text-align:center'>🎓</div><p style='text-align:center'>{chosen}</p>", unsafe_allow_html=True)
+            # Try the logo service, then the domain favicon. If both fail, show a graceful branded fallback.
+            logo_bytes = None
+            for logo_url in (f"https://logo.clearbit.com/{info['domain']}?size=256", f"https://www.google.com/s2/favicons?domain={info['domain']}&sz=256"):
+                try:
+                    response = requests.get(logo_url, timeout=7, headers={"User-Agent":"LidyaAI/1.0"})
+                    if response.ok and response.headers.get("content-type", "").startswith("image/") and len(response.content) > 500:
+                        logo_bytes = response.content
+                        break
+                except requests.RequestException:
+                    pass
+            if logo_bytes:
+                st.image(logo_bytes, caption=f"{chosen} logo / site icon", use_container_width=True)
+            else:
+                initials = "".join(word[0] for word in chosen.replace("University of ", "").split()[:3]).upper()
+                st.markdown(f"<div style='border:1px solid #8b6bc2;border-radius:20px;padding:26px;text-align:center;background:linear-gradient(145deg,#281b43,#111020)'><div style='font-size:44px;font-weight:900;color:#e4caff'>{initials or 'UNI'}</div><div style='font-size:13px;color:#d8c8f4'>{chosen}</div></div>", unsafe_allow_html=True)
         with col_info:
             st.markdown(f"#### {chosen}")
-            st.write(description)
-            st.link_button("🌐 Resmî üniversite sitesi", official_url, use_container_width=True)
-            st.caption("Logo harici bir logo servisi üzerinden yüklenir; görüntülenmezse üniversitenin resmî sitesini aç.")
+            st.write(info["focus"])
+            st.caption(f"Bölge: {info['region']} · Finansman: {info['aid']}")
+            st.link_button("🌐 Resmî üniversite sitesi", info["url"], use_container_width=True)
+            if st.button("⭐ Hedef listeme ekle", key="uni_add_" + info["domain"], use_container_width=True):
+                if chosen not in st.session_state.uni_shortlist:
+                    st.session_state.uni_shortlist.append(chosen)
+                st.success("Hedef listene eklendi.")
+        st.markdown("#### 🔎 Üniversiteleri karşılaştır")
+        compare = st.multiselect("Karşılaştırmak istediğin üniversiteler", list(universities.keys()), default=["Harvard University", "University of Oxford"], key="uni_compare")
+        if compare:
+            rows = [{"Üniversite": name, "Bölge": universities[name]["region"], "Akademik odak": universities[name]["focus"], "Finansman notu": universities[name]["aid"]} for name in compare]
+            st.dataframe(rows, use_container_width=True, hide_index=True)
+        if st.session_state.uni_shortlist:
+            st.markdown("#### ⭐ Hedef listen")
+            st.write(" · ".join(st.session_state.uni_shortlist))
+            remove = st.selectbox("Listeden çıkar", ["Seçme"] + st.session_state.uni_shortlist, key="uni_remove_choice")
+            if remove != "Seçme" and st.button("Listeden çıkar", key="uni_remove_btn"):
+                st.session_state.uni_shortlist.remove(remove)
+                st.rerun()
         st.markdown("#### 🧭 Başvuru hedefi simülatörü")
         c1, c2 = st.columns(2)
         target_year = c1.selectbox("Hedef başlangıç yılı", ["2027", "2028", "2029", "2030"], index=1, key="uni_target_year")
         stage = c2.selectbox("Şu anki aşaman", ["Keşif", "Akademik hazırlık", "Sınav ve dil planı", "Essay ve etkinlikler", "Başvuru gönderimi"], key="uni_stage")
+        milestones = ["Üniversite ve bölüm listesi", "Akademik belgeler", "Dil ve sınav politikası", "Essay ve proje portföyü", "Maddi yardım belgeleri", "Başvuruyu son kez kontrol et"]
+        completed = st.multiselect("Tamamladığın adımlar", milestones, key="uni_milestones")
+        st.progress(len(completed) / len(milestones), text=f"Başvuru hazırlığı: {len(completed)}/{len(milestones)} adım")
         if st.button("🗺️ Kişisel yol haritamı göster", key="uni_roadmap"):
-            plans = {
-                "Keşif": "3–5 üniversite seç; her biri için resmî bölüm ve kabul sayfalarını kaydet.",
-                "Akademik hazırlık": "Transkriptini, derslerini ve varsa beklenen mezuniyet belgelerini düzenle.",
-                "Sınav ve dil planı": "Her üniversitenin güncel test politikasını resmî kaynaktan kontrol et; sınav muafiyetlerini varsayma.",
-                "Essay ve etkinlikler": "Projelerini, öğrenme sürecini ve etkisini somut örneklerle belgele.",
-                "Başvuru gönderimi": "Her başvurunun belge listesi, son tarihi ve gönderim onayını ayrı ayrı kontrol et.",
-            }
-            st.success(f"{target_year} başlangıcı için ilk adım: {plans[stage]}")
-        st.info("Bu keşif paneli bilgilendirme amaçlıdır. Kabul koşulları, son tarihler ve burslar değişebilir; başvurmadan önce resmî sayfaları doğrula.")
+            plans = {"Keşif":"3–5 üniversite seç; her biri için resmî bölüm ve kabul sayfalarını kaydet.", "Akademik hazırlık":"Transkriptini, derslerini ve mezuniyet belgelerini düzenle.", "Sınav ve dil planı":"Güncel test politikasını resmî kaynaktan kontrol et; muafiyet varsayma.", "Essay ve etkinlikler":"Projelerini, öğrendiklerini ve etkisini somut örneklerle belgele.", "Başvuru gönderimi":"Her başvurunun belge listesi, son tarihi ve gönderim onayını ayrı ayrı kontrol et."}
+            st.success(f"{target_year} başlangıcı için önerilen sonraki adım: {plans[stage]}")
+        st.info("Bu panel başvuru takibi içindir; kabul veya burs garantisi vermez. Gereklilikler, tarihler ve finansman politikaları değişebilir. Her bilgiyi başvurmadan önce ilgili üniversitenin resmî sayfasında doğrula.")
 
     elif module == "🩺 Medical & Anatomy":
         st.markdown("### 🩺 Anatomi etkileşim laboratuvarı")
@@ -716,7 +746,7 @@ def render_module_simulation(module):
 
     elif module == "📁 File Laboratory":
         st.markdown("### 📁 Dosya laboratuvarı")
-        st.caption("Sohbet kutusuna PDF, DOCX, TXT, MD, CSV, JSON veya PY dosyası ekleyip özetleme, karşılaştırma ya da soru-cevap iste.")
+        st.caption("PDF, DOCX, TXT, MD, CSV, JSON ve PY dosyalarını sohbet kutusundan ekleyip özetleme, kavram çıkarma, karşılaştırma veya soru-cevap iste. Metin çıkarımı sınırlı uzunlukta yapılır; taranmış PDF ve görseller her zaman okunamayabilir.")
         task = st.selectbox("Dosya inceleme görevi", ["Özetle", "Anahtar kavramları çıkar", "İki dosyayı karşılaştır", "Sorular hazırla"], key="file_sim_task")
         st.write(f"Seçilen iş akışı: **{task}**. Dosyayı aşağıdaki sohbet alanından ekleyebilirsin.")
 
@@ -741,7 +771,7 @@ if selected_module == "⚙️ Ayarlar":
         st.session_state.current_chat_by_module = {}
         st.session_state.last_answer = ""
         st.rerun()
-    st.caption("Bu ayarlar oturum boyunca geçerlidir. Kalıcı kullanıcı profili bu sürümde bulunmaz.")
+    st.caption("Bu ayarlar oturum boyunca geçerlidir. Sohbetler yeni sohbet açınca korunur; uygulama oturumu tamamen kapanırsa kalıcı saklama için harici veritabanı gerekir.")
 
 elif selected_module == "📐 Mathematics":
     st.subheader("📐 Mathematics Lab")
@@ -907,12 +937,12 @@ if selected_module in MODULES and selected_module not in ("🎬 Video Studio", "
                         if spoken_text:
                             active_messages = get_messages(selected_module)
                             history = list(active_messages)
-                            active_messages.append({"role":"user","content":spoken_text,"time":turkish_time()})
                             api_messages = [{"role":"system","content":build_system_instruction(selected_module,language)}]
                             for item in history[-8:]:
                                 if item.get("role") in ("user","assistant"):
                                     api_messages.append({"role":item["role"],"content":item["content"][:9000]})
                             api_messages.append({"role":"user","content":spoken_text})
+                            active_messages.append({"role":"user","content":spoken_text,"time":turkish_time()})
                             with st.spinner(ui["thinking"]):
                                 result = client.chat.completions.create(model=MODEL_NAME,messages=api_messages,temperature=.4,max_completion_tokens=2200)
                             voice_answer = result.choices[0].message.content or ""
