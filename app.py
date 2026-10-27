@@ -1,6 +1,7 @@
 import os
 import io
 import json
+import html
 import base64
 import tempfile
 from datetime import datetime
@@ -11,7 +12,11 @@ import requests
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-from groq import Groq
+
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
 
 try:
     from pypdf import PdfReader
@@ -24,9 +29,9 @@ except ImportError:
     Document = None
 
 
-# =========================================================
-# 1. CONFIGURATION
-# =========================================================
+# ---------------------------------------------------------
+# AYARLAR
+# ---------------------------------------------------------
 
 st.set_page_config(
     page_title="Lidya AI",
@@ -35,1320 +40,1075 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-CHAT_MODEL = "openai/gpt-oss-20b"
-IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell"
-MAX_FILE_SIZE = 10 * 1024 * 1024
+APP_NAME = "Lidya AI"
+MODEL_NAME = "openai/gpt-oss-20b"
+TZ = ZoneInfo("Europe/Istanbul")
 
-def secret(name):
-    try:
-        value = st.secrets.get(name)
-        if value:
-            return value
-    except Exception:
-        pass
-    return os.getenv(name)
+GROQ_API_KEY = (
+    st.secrets.get("GROQ_API_KEY", "")
+    if hasattr(st, "secrets")
+    else ""
+) or os.getenv("GROQ_API_KEY", "")
 
-GROQ_API_KEY = secret("GROQ_API_KEY")
-CF_ACCOUNT_ID = secret("CLOUDFLARE_ACCOUNT_ID")
-CF_API_TOKEN = secret("CLOUDFLARE_API_TOKEN")
+CF_ACCOUNT_ID = (
+    st.secrets.get("CLOUDFLARE_ACCOUNT_ID", "")
+    if hasattr(st, "secrets")
+    else ""
+) or os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
 
-
-# =========================================================
-# 2. LANGUAGES
-# =========================================================
-
-LANGUAGES = {
-    "Türkçe 🇹🇷": "tr",
-    "English 🇬🇧": "en",
-    "Français 🇫🇷": "fr",
-    "Deutsch 🇩🇪": "de",
-    "Español 🇪🇸": "es",
-    "Italiano 🇮🇹": "it",
-    "日本語 🇯🇵": "ja",
-    "简体中文 🇨🇳": "zh",
-    "العربية 🇸🇦": "ar",
-}
-
-# Arayüzün temel metinleri seçilen dile göre değişir.
-UI = {
-    "tr": {
-        "workspace": "Çalışma alanı",
-        "chat": "💜 Lidya ile Sohbet",
-        "file": "📁 Dosya Laboratuvarı",
-        "medical": "🫀 Tıp ve Anatomi",
-        "legal": "⚖️ Hukuk Araştırmaları",
-        "language": "🌍 Dil Öğretmeni",
-        "coding": "💻 Yazılım Mühendisliği",
-        "science": "🔬 Bilim ve Araştırma",
-        "math": "📐 Matematik",
-        "engineering": "⚙️ Mühendislik",
-        "education": "🎓 Eğitim",
-        "business": "📊 İşletme ve Ekonomi",
-        "writing": "✍️ Yazma ve Yaratıcılık",
-        "data": "📈 Veri Analizi",
-        "cyber": "🛡️ Siber Güvenlik",
-        "devices": "🔌 Akıllı Cihazlar",
-        "image": "🎨 Görsel Atölyesi",
-        "video": "🎬 Video Atölyesi",
-        "sim": "🪐 Simülasyonlar",
-        "history": "🏛️ Tarih Araştırmaları",
-        "university": "🎓 Üniversite Araştırmaları",
-        "karaoke": "🎤 Şarkı ve Ses Laboratuvarı",
-        "tagline": "Düşün. Öğren. Üret. Keşfet.",
-        "welcome": "Merhaba! Bugün ne öğrenmek veya üretmek istiyorsun?",
-        "prompt": "Lidya'ya bir şey sor...",
-        "thinking": "Lidya düşünüyor...",
-        "new": "➕ Yeni sohbet",
-        "clear": "🧹 Sohbeti temizle",
-        "send": "Gönder",
-        "upload": "Dosya yükle",
-        "analyze": "Analiz et",
-        "question": "Dosyayla ilgili ne yapmamı istiyorsun?",
-        "image_prompt": "Nasıl bir görsel oluşturalım?",
-        "make_image": "✨ Görsel oluştur",
-        "video_prompt": "Video için bir sahne tarif et",
-        "make_video": "🎬 Animasyonlu MP4 oluştur",
-        "simulation": "Lidya Simülasyon Laboratuvarı",
-        "simulation_desc": "Matematik ve bilim modellerini etkileşimli olarak keşfet.",
-        "sim_type": "Simülasyon türü",
-        "projectile": "🚀 Fırlatma hareketi",
-        "orbit": "🪐 Yörünge modeli",
-        "function": "📈 Fonksiyon grafiği",
-        "wave": "〰️ Dalga simülasyonu",
-        "angle": "Fırlatma açısı",
-        "velocity": "Başlangıç hızı",
-        "gravity": "Yerçekimi",
-        "frequency": "Frekans",
-        "amplitude": "Genlik",
-        "result": "Sonuç",
-        "remember": "🧠 Bu bilgiyi oturum hafızasına kaydet",
-        "memory": "Oturum hafızası",
-        "voice": "🎙️ Ses kaydı",
-        "transcribe": "Sesi yazıya çevir",
-        "read": "🔊 Son yanıtı sesli oku",
-        "notice": "Tıp ve hukuk konularında uzman görüşünü doğrula.",
-        "missing_key": "Sohbet için Streamlit Secrets bölümüne GROQ_API_KEY eklemelisin.",
-        "missing_cf": "Görsel üretimi için Cloudflare hesap bilgileri gerekli.",
-        "timestamp": "Yerel tarih ve saat",
-        "official": "Resmî web sitesi",
-        "research": "Araştırma sorusu",
-        "research_button": "🔎 Araştırma isteği hazırla",
-        "karaoke_help": "Kendi ses kaydını veya kullanma hakkına sahip olduğun bir ses dosyasını yükle. Bu alan henüz otomatik perde ve ritim değerlendirmesi yapmaz.",
-        "not_live": "Bu alan tek başına canlı internet araştırması yapmaz. Sonuçları resmî kaynaklardan doğrula.",
-    },
-    "en": {
-        "workspace": "Workspace",
-        "chat": "💜 Chat with Lidya",
-        "file": "📁 File Laboratory",
-        "medical": "🫀 Medicine & Anatomy",
-        "legal": "⚖️ Legal Research",
-        "language": "🌍 Language Teacher",
-        "coding": "💻 Software Engineering",
-        "science": "🔬 Science & Research",
-        "math": "📐 Mathematics",
-        "engineering": "⚙️ Engineering",
-        "education": "🎓 Education",
-        "business": "📊 Business & Economics",
-        "writing": "✍️ Writing & Creativity",
-        "data": "📈 Data Analysis",
-        "cyber": "🛡️ Cybersecurity",
-        "devices": "🔌 Smart Devices",
-        "image": "🎨 Image Studio",
-        "video": "🎬 Video Studio",
-        "sim": "🪐 Simulations",
-        "history": "🏛️ History Research",
-        "university": "🎓 University Research",
-        "karaoke": "🎤 Song & Audio Lab",
-        "tagline": "Think. Learn. Create. Explore.",
-        "welcome": "Hello! What would you like to learn or create today?",
-        "prompt": "Ask Lidya something...",
-        "thinking": "Lidya is thinking...",
-        "new": "➕ New chat",
-        "clear": "🧹 Clear chat",
-        "send": "Send",
-        "upload": "Upload file",
-        "analyze": "Analyze",
-        "question": "What should I do with this file?",
-        "image_prompt": "Describe the image you want to create",
-        "make_image": "✨ Generate image",
-        "video_prompt": "Describe a scene for your video",
-        "make_video": "🎬 Create animated MP4",
-        "simulation": "Lidya Simulation Laboratory",
-        "simulation_desc": "Explore mathematical and scientific models interactively.",
-        "sim_type": "Simulation type",
-        "projectile": "🚀 Projectile motion",
-        "orbit": "🪐 Orbital model",
-        "function": "📈 Function graph",
-        "wave": "〰️ Wave simulation",
-        "angle": "Launch angle",
-        "velocity": "Initial velocity",
-        "gravity": "Gravity",
-        "frequency": "Frequency",
-        "amplitude": "Amplitude",
-        "result": "Result",
-        "remember": "🧠 Save this to session memory",
-        "memory": "Session memory",
-        "voice": "🎙️ Audio recording",
-        "transcribe": "Transcribe audio",
-        "read": "🔊 Read last answer aloud",
-        "notice": "Verify medical and legal information with qualified professionals.",
-        "missing_key": "Add GROQ_API_KEY in Streamlit Secrets to enable chat.",
-        "missing_cf": "Cloudflare credentials are required for image generation.",
-        "timestamp": "Local date and time",
-        "official": "Official website",
-        "research": "Research question",
-        "research_button": "🔎 Prepare research request",
-        "karaoke_help": "Upload your own recording or audio you have permission to use. Automatic pitch and rhythm evaluation is not implemented yet.",
-        "not_live": "This area does not independently perform live web research. Verify results using official sources.",
-    },
-    "fr": {
-        "workspace": "Espace de travail",
-        "chat": "💜 Discuter avec Lidya",
-        "file": "📁 Laboratoire de fichiers",
-        "medical": "🫀 Médecine et anatomie",
-        "legal": "⚖️ Recherche juridique",
-        "language": "🌍 Professeur de langues",
-        "coding": "💻 Ingénierie logicielle",
-        "science": "🔬 Sciences et recherche",
-        "math": "📐 Mathématiques",
-        "engineering": "⚙️ Ingénierie",
-        "education": "🎓 Éducation",
-        "business": "📊 Économie et gestion",
-        "writing": "✍️ Écriture et créativité",
-        "data": "📈 Analyse de données",
-        "cyber": "🛡️ Cybersécurité",
-        "devices": "🔌 Appareils intelligents",
-        "image": "🎨 Atelier d’images",
-        "video": "🎬 Atelier vidéo",
-        "sim": "🪐 Simulations",
-        "history": "🏛️ Recherche historique",
-        "university": "🎓 Recherche universitaire",
-        "karaoke": "🎤 Laboratoire audio",
-        "tagline": "Réfléchir. Apprendre. Créer. Explorer.",
-        "welcome": "Bonjour ! Que souhaitez-vous apprendre ou créer aujourd’hui ?",
-        "prompt": "Posez une question à Lidya...",
-        "thinking": "Lidya réfléchit...",
-        "new": "➕ Nouvelle discussion",
-        "clear": "🧹 Effacer la discussion",
-        "send": "Envoyer",
-        "upload": "Téléverser un fichier",
-        "analyze": "Analyser",
-        "question": "Que dois-je faire avec ce fichier ?",
-        "image_prompt": "Décrivez l’image à créer",
-        "make_image": "✨ Créer une image",
-        "video_prompt": "Décrivez une scène vidéo",
-        "make_video": "🎬 Créer une animation MP4",
-        "simulation": "Laboratoire de simulation Lidya",
-        "simulation_desc": "Explorez des modèles mathématiques et scientifiques.",
-        "sim_type": "Type de simulation",
-        "projectile": "🚀 Mouvement d’un projectile",
-        "orbit": "🪐 Modèle orbital",
-        "function": "📈 Graphe de fonction",
-        "wave": "〰️ Simulation d’onde",
-        "angle": "Angle de lancement",
-        "velocity": "Vitesse initiale",
-        "gravity": "Gravité",
-        "frequency": "Fréquence",
-        "amplitude": "Amplitude",
-        "result": "Résultat",
-        "remember": "🧠 Enregistrer dans la mémoire de session",
-        "memory": "Mémoire de session",
-        "voice": "🎙️ Enregistrement audio",
-        "transcribe": "Transcrire l’audio",
-        "read": "🔊 Lire la dernière réponse",
-        "notice": "Vérifiez les informations médicales et juridiques auprès de professionnels.",
-        "missing_key": "Ajoutez GROQ_API_KEY dans Streamlit Secrets.",
-        "missing_cf": "Les identifiants Cloudflare sont requis pour créer des images.",
-        "timestamp": "Date et heure locales",
-        "official": "Site officiel",
-        "research": "Question de recherche",
-        "research_button": "🔎 Préparer la recherche",
-        "karaoke_help": "Téléversez votre propre enregistrement ou un fichier audio autorisé. L’évaluation automatique de la justesse n’est pas disponible.",
-        "not_live": "Cette section ne réalise pas elle-même de recherche Web en direct. Vérifiez les sources officielles.",
-    },
-}
-
-# D'autres langues ont leurs propres étiquettes principales.
-# Les textes non traduits sont fournis en anglais plutôt qu'en turc.
-OTHER_LANGS = {
-    "de": {
-        "workspace": "Arbeitsbereich", "chat": "💜 Mit Lidya chatten",
-        "file": "📁 Datei-Labor", "medical": "🫀 Medizin und Anatomie",
-        "legal": "⚖️ Rechtsrecherche", "language": "🌍 Sprachlehrer",
-        "coding": "💻 Softwareentwicklung", "science": "🔬 Wissenschaft",
-        "math": "📐 Mathematik", "engineering": "⚙️ Ingenieurwesen",
-        "education": "🎓 Bildung", "business": "📊 Wirtschaft",
-        "writing": "✍️ Schreiben", "data": "📈 Datenanalyse",
-        "cyber": "🛡️ Cybersicherheit", "devices": "🔌 Smarte Geräte",
-        "image": "🎨 Bildstudio", "video": "🎬 Videostudio",
-        "sim": "🪐 Simulationen", "history": "🏛️ Geschichte",
-        "university": "🎓 Universitätsrecherche",
-        "karaoke": "🎤 Audio-Labor",
-        "tagline": "Denken. Lernen. Erstellen. Entdecken.",
-        "welcome": "Hallo! Was möchtest du heute lernen oder erstellen?",
-        "prompt": "Frag Lidya etwas...", "thinking": "Lidya denkt nach...",
-        "new": "➕ Neuer Chat", "clear": "🧹 Chat löschen",
-        "send": "Senden", "simulation": "Lidya Simulationslabor",
-        "simulation_desc": "Erkunde mathematische und wissenschaftliche Modelle.",
-        "run_sim": "Simulation starten",
-    },
-    "es": {
-        "workspace": "Espacio de trabajo", "chat": "💜 Chatear con Lidya",
-        "file": "📁 Laboratorio de archivos", "medical": "🫀 Medicina y anatomía",
-        "legal": "⚖️ Investigación jurídica", "language": "🌍 Profesor de idiomas",
-        "coding": "💻 Ingeniería de software", "science": "🔬 Ciencia e investigación",
-        "math": "📐 Matemáticas", "engineering": "⚙️ Ingeniería",
-        "education": "🎓 Educación", "business": "📊 Economía",
-        "writing": "✍️ Escritura", "data": "📈 Análisis de datos",
-        "cyber": "🛡️ Ciberseguridad", "devices": "🔌 Dispositivos inteligentes",
-        "image": "🎨 Estudio de imágenes", "video": "🎬 Estudio de vídeo",
-        "sim": "🪐 Simulaciones", "history": "🏛️ Historia",
-        "university": "🎓 Investigación universitaria",
-        "karaoke": "🎤 Laboratorio de audio",
-        "tagline": "Piensa. Aprende. Crea. Explora.",
-        "welcome": "¡Hola! ¿Qué te gustaría aprender o crear hoy?",
-        "prompt": "Pregúntale algo a Lidya...", "thinking": "Lidya está pensando...",
-        "new": "➕ Nuevo chat", "clear": "🧹 Borrar chat",
-        "send": "Enviar", "simulation": "Laboratorio de simulación Lidya",
-        "simulation_desc": "Explora modelos matemáticos y científicos.",
-    },
-    "it": {
-        "workspace": "Area di lavoro", "chat": "💜 Chatta con Lidya",
-        "file": "📁 Laboratorio file", "medical": "🫀 Medicina e anatomia",
-        "legal": "⚖️ Ricerca legale", "language": "🌍 Insegnante di lingue",
-        "coding": "💻 Ingegneria del software", "science": "🔬 Scienza e ricerca",
-        "math": "📐 Matematica", "engineering": "⚙️ Ingegneria",
-        "education": "🎓 Istruzione", "business": "📊 Economia",
-        "writing": "✍️ Scrittura", "data": "📈 Analisi dei dati",
-        "cyber": "🛡️ Sicurezza informatica", "devices": "🔌 Dispositivi intelligenti",
-        "image": "🎨 Studio immagini", "video": "🎬 Studio video",
-        "sim": "🪐 Simulazioni", "history": "🏛️ Storia",
-        "university": "🎓 Ricerca universitaria",
-        "karaoke": "🎤 Laboratorio audio",
-        "tagline": "Pensa. Impara. Crea. Esplora.",
-        "welcome": "Ciao! Che cosa vorresti imparare o creare oggi?",
-        "prompt": "Chiedi qualcosa a Lidya...", "thinking": "Lidya sta pensando...",
-        "new": "➕ Nuova chat", "clear": "🧹 Cancella chat",
-        "send": "Invia", "simulation": "Laboratorio di simulazione Lidya",
-        "simulation_desc": "Esplora modelli matematici e scientifici.",
-    },
-    "ja": {
-        "workspace": "ワークスペース", "chat": "💜 Lidyaとチャット",
-        "file": "📁 ファイルラボ", "medical": "🫀 医学と解剖学",
-        "legal": "⚖️ 法律リサーチ", "language": "🌍 言語教師",
-        "coding": "💻 ソフトウェア工学", "science": "🔬 科学と研究",
-        "math": "📐 数学", "engineering": "⚙️ 工学",
-        "education": "🎓 教育", "business": "📊 ビジネス",
-        "writing": "✍️ 執筆", "data": "📈 データ分析",
-        "cyber": "🛡️ サイバーセキュリティ", "devices": "🔌 スマートデバイス",
-        "image": "🎨 画像スタジオ", "video": "🎬 動画スタジオ",
-        "sim": "🪐 シミュレーション", "history": "🏛️ 歴史研究",
-        "university": "🎓 大学調査", "karaoke": "🎤 オーディオラボ",
-        "tagline": "考える。学ぶ。創る。探求する。",
-        "welcome": "こんにちは！今日は何を学び、何を作りたいですか？",
-        "prompt": "Lidyaに質問する...", "thinking": "Lidyaが考えています...",
-        "new": "➕ 新しいチャット", "clear": "🧹 チャットを消去",
-        "send": "送信", "simulation": "Lidyaシミュレーションラボ",
-        "simulation_desc": "数学と科学のモデルを体験しましょう。",
-    },
-    "zh": {
-        "workspace": "工作区", "chat": "💜 与 Lidya 聊天",
-        "file": "📁 文件实验室", "medical": "🫀 医学与解剖学",
-        "legal": "⚖️ 法律研究", "language": "🌍 语言教师",
-        "coding": "💻 软件工程", "science": "🔬 科学与研究",
-        "math": "📐 数学", "engineering": "⚙️ 工程学",
-        "education": "🎓 教育", "business": "📊 商业与经济",
-        "writing": "✍️ 写作", "data": "📈 数据分析",
-        "cyber": "🛡️ 网络安全", "devices": "🔌 智能设备",
-        "image": "🎨 图像工作室", "video": "🎬 视频工作室",
-        "sim": "🪐 模拟实验", "history": "🏛️ 历史研究",
-        "university": "🎓 大学研究", "karaoke": "🎤 音频实验室",
-        "tagline": "思考。学习。创造。探索。",
-        "welcome": "你好！今天你想学习或创作什么？",
-        "prompt": "向 Lidya 提问...", "thinking": "Lidya 正在思考...",
-        "new": "➕ 新建聊天", "clear": "🧹 清空聊天",
-        "send": "发送", "simulation": "Lidya 模拟实验室",
-        "simulation_desc": "互动探索数学和科学模型。",
-    },
-    "ar": {
-        "workspace": "مساحة العمل", "chat": "💜 الدردشة مع ليديا",
-        "file": "📁 مختبر الملفات", "medical": "🫀 الطب والتشريح",
-        "legal": "⚖️ البحث القانوني", "language": "🌍 معلّم اللغات",
-        "coding": "💻 هندسة البرمجيات", "science": "🔬 العلوم والبحث",
-        "math": "📐 الرياضيات", "engineering": "⚙️ الهندسة",
-        "education": "🎓 التعليم", "business": "📊 الأعمال والاقتصاد",
-        "writing": "✍️ الكتابة", "data": "📈 تحليل البيانات",
-        "cyber": "🛡️ الأمن السيبراني", "devices": "🔌 الأجهزة الذكية",
-        "image": "🎨 استوديو الصور", "video": "🎬 استوديو الفيديو",
-        "sim": "🪐 المحاكاة", "history": "🏛️ التاريخ",
-        "university": "🎓 البحث الجامعي", "karaoke": "🎤 مختبر الصوت",
-        "tagline": "فكّر. تعلّم. ابتكر. اكتشف.",
-        "welcome": "مرحبًا! ماذا تريد أن تتعلم أو تنشئ اليوم؟",
-        "prompt": "اسأل ليديا...", "thinking": "ليديا تفكّر...",
-        "new": "➕ محادثة جديدة", "clear": "🧹 مسح المحادثة",
-        "send": "إرسال", "simulation": "مختبر محاكاة ليديا",
-        "simulation_desc": "استكشف النماذج الرياضية والعلمية بشكل تفاعلي.",
-    },
-}
-
-for lang, values in OTHER_LANGS.items():
-    UI[lang] = {**UI["en"], **values}
-
-for lang in LANGUAGES.values():
-    if lang not in UI:
-        UI[lang] = dict(UI["en"])
-
-# Eksik anahtarlar İngilizce karşılıklarıyla tamamlanır.
-for lang in LANGUAGES.values():
-    for key, value in UI["en"].items():
-        UI[lang].setdefault(key, value)
+CF_API_TOKEN = (
+    st.secrets.get("CLOUDFLARE_API_TOKEN", "")
+    if hasattr(st, "secrets")
+    else ""
+) or os.getenv("CLOUDFLARE_API_TOKEN", "")
 
 
-# =========================================================
-# 3. WORKSPACES AND INSTRUCTIONS
-# =========================================================
-
-WORKSPACES = [
-    "chat", "file", "medical", "legal", "language", "coding",
-    "science", "math", "engineering", "education", "business",
-    "writing", "data", "cyber", "devices", "history",
-    "university", "karaoke", "image", "video", "sim",
-]
-
-INSTRUCTIONS = {
-    "chat": "Be a helpful, thoughtful, accurate AI assistant.",
-    "file": "Analyze documents carefully. Separate facts from assumptions.",
-    "medical": "Explain anatomy and medicine educationally. Do not diagnose users.",
-    "legal": "Explain general legal concepts. Laws depend on jurisdiction.",
-    "language": "Teach languages interactively. Correct mistakes kindly.",
-    "coding": "Help with programming, debugging, testing, and software design.",
-    "science": "Explain scientific concepts and distinguish evidence from hypotheses.",
-    "math": "Explain mathematical reasoning step by step and check calculations.",
-    "engineering": "Explain engineering principles, units, assumptions, and limitations.",
-    "education": "Teach step by step and adapt explanations to the learner.",
-    "business": "Explain business and economics with clear assumptions.",
-    "writing": "Help with writing, editing, creativity, and constructive feedback.",
-    "data": "Analyze data carefully. Do not invent results.",
-    "cyber": "Focus on defensive cybersecurity and authorized testing.",
-    "devices": "Explain electronics and smart devices with attention to safety.",
-    "history": "Explain history using dates, context, and competing interpretations. Do not invent citations.",
-    "university": "Help research universities, admissions requirements, programs, deadlines, and official sources. Do not promise admission or invent current deadlines.",
-    "karaoke": "Help with vocal practice, breathing, pronunciation, and musical concepts. Do not reproduce copyrighted song lyrics.",
-    "image": "Help with visual design and image prompts.",
-    "video": "Help plan video scenes and motion. Be clear about what tools can actually generate.",
-    "sim": "Explain simulations, assumptions, units, and limitations.",
-}
-
-
-# =========================================================
-# 4. VISUAL DESIGN
-# =========================================================
+# ---------------------------------------------------------
+# TASARIM
+# ---------------------------------------------------------
 
 st.markdown("""
 <style>
-.stApp {
-    background:
-      radial-gradient(circle at 85% 4%, rgba(151,91,235,.18), transparent 32%),
-      linear-gradient(135deg,#100d1c,#191329 55%,#100d1c);
-    color:#f5f0ff;
-}
-[data-testid="stSidebar"] {
-    background:linear-gradient(180deg,#211432,#110d1c);
-    border-right:1px solid rgba(191,151,255,.2);
-}
-h1,h2,h3 {color:#e0c5ff !important;}
-.lidya-header {
-    padding:25px 20px;
-    border:1px solid rgba(196,160,255,.3);
-    border-radius:22px;
-    background:linear-gradient(120deg,rgba(109,61,171,.32),rgba(39,24,64,.65));
-    margin-bottom:18px;
-    text-align:center;
-}
-.lidya-title {
-    font-size:clamp(30px,5vw,44px);
-    font-weight:850;
-    letter-spacing:2px;
-    color:#e8d4ff;
-}
-.lidya-subtitle {color:#d7c6ed;font-size:16px;}
-.lidya-orb {
-    width:64px;height:64px;margin:0 auto 12px;border-radius:50%;
-    background:radial-gradient(circle at 30% 25%,#fff 0%,#e5c8ff 9%,#b27bff 28%,#6338a5 58%,#28133e 80%);
-    box-shadow:0 0 20px rgba(190,126,255,.5);
-}
-.lidya-card {
-    border:1px solid rgba(196,160,255,.25);
-    border-radius:18px;padding:22px;
-    background:rgba(48,32,68,.42);
-}
-.stButton>button {
-    border-radius:11px;border:1px solid rgba(199,165,255,.35);
-}
-[data-testid="stChatMessage"] {
-    border:1px solid rgba(195,161,255,.12);
-    border-radius:14px;
-}
-.lidya-footer {
-    margin-top:28px;padding:18px;text-align:center;
-    color:#bfa9dc;border-top:1px solid rgba(195,161,255,.16);
-}
+    :root {
+        --purple: #a78bfa;
+        --dark: #100c1c;
+        --panel: #1b1530;
+        --border: rgba(190,160,255,.19);
+    }
+
+    .stApp {
+        background:
+            radial-gradient(ellipse at top, #25163e 0%, #100c1c 48%);
+        color: #f6f1ff;
+    }
+
+    section[data-testid="stSidebar"] {
+        background: #120d20;
+        border-right: 1px solid var(--border);
+    }
+
+    h1, h2, h3 {
+        color: #f6f0ff !important;
+    }
+
+    .lidya-hero {
+        padding: 34px 20px 28px 20px;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: linear-gradient(135deg,
+            rgba(124,58,237,.20),
+            rgba(30,20,48,.70));
+        text-align: center;
+        margin-bottom: 22px;
+    }
+
+    .lidya-title {
+        font-size: clamp(32px, 5vw, 52px);
+        font-weight: 800;
+        letter-spacing: -1.5px;
+        margin-bottom: 8px;
+    }
+
+    .lidya-subtitle {
+        color: #d7c9f8;
+        font-size: 17px;
+    }
+
+    .lidya-card {
+        border: 1px solid var(--border);
+        background: rgba(28,21,47,.8);
+        border-radius: 16px;
+        padding: 18px;
+        margin: 8px 0;
+    }
+
+    .small-muted {
+        color: #b9abcF;
+        font-size: 13px;
+    }
+
+    .university-card {
+        border: 1px solid var(--border);
+        border-radius: 17px;
+        background: rgba(27,21,45,.85);
+        padding: 16px;
+        min-height: 155px;
+        margin-bottom: 12px;
+    }
+
+    .stButton > button {
+        border-radius: 11px;
+        border: 1px solid var(--border);
+    }
+
+    [data-testid="stChatMessage"] {
+        border: 1px solid rgba(190,160,255,.10);
+        border-radius: 14px;
+        padding: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 
-# =========================================================
-# 5. SESSION STATE
-# =========================================================
+# ---------------------------------------------------------
+# ÇEVİRİLER
+# ---------------------------------------------------------
 
-DEFAULTS = {
-    "messages": [],
-    "last_answer": "",
-    "generated_image": None,
-    "generated_video": None,
-    "memory_items": [],
-    "transcript": "",
+LANGUAGES = {
+    "Türkçe": "tr",
+    "English": "en",
+    "Français": "fr",
+    "Deutsch": "de",
+    "Español": "es",
+    "Italiano": "it",
+    "日本語": "ja",
+    "العربية": "ar",
+    "简体中文": "zh",
 }
 
-for key, value in DEFAULTS.items():
-    if key not in st.session_state:
-        st.session_state[key] = value
+UI = {
+    "tr": {
+        "home": "Ana sayfa", "chat": "Lidya ile Sohbet",
+        "file": "Dosya Laboratuvarı", "medical": "Tıp ve Anatomi",
+        "legal": "Hukuk Araştırmaları", "language": "Dil Öğretmeni",
+        "coding": "Yazılım Mühendisliği", "science": "Bilim ve Araştırma",
+        "math": "Matematik", "engineering": "Mühendislik",
+        "education": "Eğitim", "business": "İşletme ve Ekonomi",
+        "writing": "Yazma ve Yaratıcılık", "data": "Veri Analizi",
+        "cyber": "Siber Güvenlik", "devices": "Akıllı Cihazlar",
+        "image": "Görsel Atölyesi", "video": "Video Atölyesi",
+        "sim": "Simülasyon Laboratuvarı", "history": "Tarih",
+        "universities": "Üniversite Keşfi", "karaoke": "Ses ve Karaoke",
+        "memory": "Lidya Hafızası", "settings": "Ayarlar",
+        "send": "Mesajını yaz...", "upload": "Dosya ekle",
+        "analyze": "Dosyayı analiz et", "clear": "Sohbeti temizle",
+        "remember": "Hatırla:", "show_memory": "Hafızayı göster",
+        "clear_memory": "Hafızayı temizle", "prompt": "İsteğini yaz",
+        "generate": "Oluştur", "welcome": "Düşün. Öğren. Üret. Keşfet.",
+    },
+    "en": {
+        "home": "Home", "chat": "Chat with Lidya",
+        "file": "File Lab", "medical": "Medicine & Anatomy",
+        "legal": "Legal Research", "language": "Language Teacher",
+        "coding": "Software Engineering", "science": "Science & Research",
+        "math": "Mathematics", "engineering": "Engineering",
+        "education": "Education", "business": "Business & Economics",
+        "writing": "Writing & Creativity", "data": "Data Analysis",
+        "cyber": "Cybersecurity", "devices": "Smart Devices",
+        "image": "Image Studio", "video": "Video Studio",
+        "sim": "Simulation Lab", "history": "History",
+        "universities": "University Explorer", "karaoke": "Audio & Karaoke",
+        "memory": "Lidya Memory", "settings": "Settings",
+        "send": "Write your message...", "upload": "Attach a file",
+        "analyze": "Analyze file", "clear": "Clear chat",
+        "remember": "Remember:", "show_memory": "Show memory",
+        "clear_memory": "Clear memory", "prompt": "Write your request",
+        "generate": "Generate", "welcome": "Think. Learn. Create. Explore.",
+    },
+}
+
+UI["fr"] = dict(UI["en"], home="Accueil", chat="Discuter avec Lidya",
+    file="Laboratoire de fichiers", medical="Médecine et anatomie",
+    math="Mathématiques", history="Histoire", universities="Découvrir les universités",
+    karaoke="Audio et karaoké", welcome="Réfléchir. Apprendre. Créer. Explorer.")
+UI["de"] = dict(UI["en"], home="Startseite", chat="Mit Lidya chatten",
+    file="Datei-Labor", medical="Medizin und Anatomie", math="Mathematik",
+    history="Geschichte", universities="Universitäten entdecken",
+    karaoke="Audio und Karaoke", welcome="Denken. Lernen. Gestalten. Entdecken.")
+UI["es"] = dict(UI["en"], home="Inicio", chat="Hablar con Lidya",
+    file="Laboratorio de archivos", medical="Medicina y anatomía",
+    math="Matemáticas", history="Historia", universities="Explorar universidades",
+    karaoke="Audio y karaoke", welcome="Pensar. Aprender. Crear. Explorar.")
+UI["it"] = dict(UI["en"], home="Home", chat="Chatta con Lidya",
+    file="Laboratorio file", medical="Medicina e anatomia", math="Matematica",
+    history="Storia", universities="Esplora università",
+    karaoke="Audio e karaoke", welcome="Pensa. Impara. Crea. Esplora.")
+UI["ja"] = dict(UI["en"], home="ホーム", chat="Lidyaとチャット",
+    file="ファイルラボ", medical="医学と解剖学", math="数学",
+    history="歴史", universities="大学を探す", karaoke="音声とカラオケ",
+    welcome="考える。学ぶ。創る。探求する。")
+UI["ar"] = dict(UI["en"], home="الرئيسية", chat="الدردشة مع ليديا",
+    file="مختبر الملفات", medical="الطب والتشريح", math="الرياضيات",
+    history="التاريخ", universities="استكشاف الجامعات",
+    karaoke="الصوت والكاريوكي", welcome="فكّر. تعلّم. ابتكر. اكتشف.")
+UI["zh"] = dict(UI["en"], home="主页", chat="与 Lidya 聊天",
+    file="文件实验室", medical="医学与解剖学", math="数学",
+    history="历史", universities="探索大学", karaoke="音频与卡拉OK",
+    welcome="思考。学习。创造。探索。")
 
 
-def timestamp():
+# ---------------------------------------------------------
+# MODÜLLER
+# ---------------------------------------------------------
+
+MODULE_KEYS = [
+    "home", "chat", "file", "medical", "legal", "language", "coding",
+    "science", "math", "engineering", "education", "business", "writing",
+    "data", "cyber", "devices", "image", "video", "sim", "history",
+    "universities", "karaoke", "memory", "settings"
+]
+
+SPECIALIST_PROMPTS = {
+    "medical": (
+        "Tıp ve anatomi eğitim asistanısın. Anatomik yapıları bilimsel ve "
+        "anlaşılır biçimde açıkla. Tanı koyma veya doktorun yerini aldığını "
+        "iddia etme. Acil belirtilerde profesyonel sağlık yardımına yönlendir."
+    ),
+    "legal": (
+        "Hukuk araştırma asistanısın. Genel hukuki kavramları açıkla; "
+        "ülke ve tarih farklarını belirt. Avukat gibi kesin kişisel hukuki "
+        "tavsiye verme. Gerektiğinde resmî kaynak doğrulaması öner."
+    ),
+    "language": "Dil öğretmenisin. Seviyeye uygun açıklama, örnek ve alıştırmalar sun.",
+    "coding": "Yazılım mühendisliği asistanısın. Çalışan, güvenli ve açıklamalı kod yaz.",
+    "science": "Bilimsel araştırma asistanısın. Kanıtı, varsayımı ve belirsizliği ayır.",
+    "math": "Matematik öğretmenisin. Çözümleri adım adım ve kontrol ederek anlat.",
+    "engineering": "Mühendislik asistanısın. Varsayımları, birimleri ve güvenlik sınırlarını belirt.",
+    "education": "Öğrenme koçusun. Konuları basitten karmaşığa öğret ve mini alıştırmalar sun.",
+    "business": "İşletme ve ekonomi asistanısın. Varsayımları açıkla, kesin finansal sonuç vaat etme.",
+    "writing": "Yazma ve yaratıcılık asistanısın. Özgün taslaklar, düzenleme ve geri bildirim sun.",
+    "data": "Veri analizi asistanısın. Verinin sınırlarını belirt ve uygun analiz öner.",
+    "cyber": "Siber güvenlik asistanısın. Savunma, güvenli kodlama ve izinli testlere odaklan.",
+    "devices": "Akıllı cihazlar ve IoT asistanısın. Güvenli ve uygulanabilir açıklamalar ver.",
+    "history": (
+        "Tarih öğretmenisin. Olayları kronoloji, nedenler, sonuçlar ve farklı "
+        "tarihçilerin yorumlarıyla açıkla. Belirsiz bilgileri kesinmiş gibi sunma."
+    ),
+    "chat": "Yardımsever, doğru ve açık bir genel amaçlı yapay zekâ asistanısın.",
+}
+
+MODULE_CONTEXT = {
+    "medical": "Tıp ve Anatomi",
+    "legal": "Hukuk Araştırmaları",
+    "language": "Dil Öğretmeni",
+    "coding": "Yazılım Mühendisliği",
+    "science": "Bilim ve Araştırma",
+    "math": "Matematik",
+    "engineering": "Mühendislik",
+    "education": "Eğitim",
+    "business": "İşletme ve Ekonomi",
+    "writing": "Yazma ve Yaratıcılık",
+    "data": "Veri Analizi",
+    "cyber": "Siber Güvenlik",
+    "devices": "Akıllı Cihazlar",
+    "history": "Tarih",
+    "chat": "Genel Sohbet",
+}
+
+UNIVERSITIES = [
+    {
+        "name": "Harvard University",
+        "domain": "harvard.edu",
+        "site": "https://www.harvard.edu/",
+        "admissions": "https://college.harvard.edu/admissions",
+        "about": "https://college.harvard.edu/",
+    },
+    {
+        "name": "University of Oxford",
+        "domain": "ox.ac.uk",
+        "site": "https://www.ox.ac.uk/",
+        "admissions": "https://www.ox.ac.uk/admissions/undergraduate",
+        "about": "https://www.ox.ac.uk/admissions/undergraduate",
+    },
+    {
+        "name": "University of Cambridge",
+        "domain": "cam.ac.uk",
+        "site": "https://www.cam.ac.uk/",
+        "admissions": "https://www.undergraduate.study.cam.ac.uk/",
+        "about": "https://www.undergraduate.study.cam.ac.uk/",
+    },
+    {
+        "name": "Massachusetts Institute of Technology",
+        "domain": "mit.edu",
+        "site": "https://www.mit.edu/",
+        "admissions": "https://mitadmissions.org/",
+        "about": "https://mitadmissions.org/",
+    },
+    {
+        "name": "Yale University",
+        "domain": "yale.edu",
+        "site": "https://www.yale.edu/",
+        "admissions": "https://admissions.yale.edu/",
+        "about": "https://admissions.yale.edu/",
+    },
+    {
+        "name": "Columbia University",
+        "domain": "columbia.edu",
+        "site": "https://www.columbia.edu/",
+        "admissions": "https://undergrad.admissions.columbia.edu/",
+        "about": "https://undergrad.admissions.columbia.edu/",
+    },
+    {
+        "name": "Princeton University",
+        "domain": "princeton.edu",
+        "site": "https://www.princeton.edu/",
+        "admissions": "https://admission.princeton.edu/",
+        "about": "https://admission.princeton.edu/",
+    },
+    {
+        "name": "Stanford University",
+        "domain": "stanford.edu",
+        "site": "https://www.stanford.edu/",
+        "admissions": "https://admission.stanford.edu/",
+        "about": "https://admission.stanford.edu/",
+    },
+]
+
+
+# ---------------------------------------------------------
+# OTURUM DURUMU
+# ---------------------------------------------------------
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "memory_items" not in st.session_state:
+    st.session_state.memory_items = []
+
+if "last_uploaded_text" not in st.session_state:
+    st.session_state.last_uploaded_text = ""
+
+if "last_uploaded_name" not in st.session_state:
+    st.session_state.last_uploaded_name = ""
+
+if "language" not in st.session_state:
+    st.session_state.language = "Türkçe"
+
+if "module" not in st.session_state:
+    st.session_state.module = "home"
+
+
+def tr_now():
+    return datetime.now(TZ).strftime("%d.%m.%Y %H:%M:%S")
+
+
+def ui(key):
+    code = LANGUAGES.get(st.session_state.language, "tr")
+    return UI.get(code, UI["en"]).get(key, UI["en"].get(key, key))
+
+
+def safe_get_secret(name):
     try:
-        return datetime.now(
-            ZoneInfo("Europe/Istanbul")
-        ).strftime("%d.%m.%Y %H:%M:%S")
+        return st.secrets.get(name, "")
     except Exception:
-        return datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+        return ""
 
 
-# =========================================================
-# 6. FILE READING
-# =========================================================
+def groq_client():
+    key = safe_get_secret("GROQ_API_KEY") or os.getenv("GROQ_API_KEY", "")
+    if not key or Groq is None:
+        return None
+    return Groq(api_key=key)
 
-def read_file(uploaded):
-    if uploaded is None:
-        raise ValueError("No file selected.")
 
-    raw = uploaded.getvalue()
-    if len(raw) > MAX_FILE_SIZE:
-        raise ValueError("File size exceeds 10 MB.")
+def ask_lidya(prompt, module="chat", history=None, file_context=""):
+    client = groq_client()
+    if client is None:
+        return (
+            "Lidya AI sohbeti için GROQ_API_KEY ayarlanmamış veya groq paketi "
+            "kurulu değil. Streamlit Cloud → App settings → Secrets bölümüne "
+            "GROQ_API_KEY ekleyip uygulamayı yeniden başlat."
+        )
 
-    name = uploaded.name.lower()
-
-    if name.endswith(".pdf"):
-        if PdfReader is None:
-            raise RuntimeError("Install pypdf.")
-        pdf = PdfReader(io.BytesIO(raw))
-        return "\n".join(page.extract_text() or "" for page in pdf.pages)
-
-    if name.endswith(".docx"):
-        if Document is None:
-            raise RuntimeError("Install python-docx.")
-        doc = Document(io.BytesIO(raw))
-        parts = [p.text for p in doc.paragraphs]
-        for table in doc.tables:
-            for row in table.rows:
-                parts.append(" | ".join(c.text for c in row.cells))
-        return "\n".join(parts)
-
-    supported = (
-        ".txt", ".md", ".csv", ".json", ".py", ".js",
-        ".html", ".css", ".xml", ".yaml", ".yml",
-        ".toml", ".sql",
-    )
-    if name.endswith(supported):
-        return raw.decode("utf-8", errors="replace")
-
-    raise ValueError(
-        "Unsupported file. Supported types: PDF, DOCX, TXT, MD, CSV, JSON, and code files."
+    system_prompt = (
+        "Sen Lidya AI adlı eğitim ve üretkenlik asistanısın. "
+        "Lidya AI projesini Şeymanur Acun geliştirmiştir. "
+        "Temel dil modeli ve üçüncü taraf hizmetlerin geliştiricileri farklı "
+        "olabilir; kendini bu modellerin yaratıcısı olarak tanıtma. "
+        "Kullanıcının seçtiği dilde yanıt ver. Açık, yararlı ve dürüst ol. "
+        "Gerçek zamanlı internet araştırması yaptığını, kaynak kontrol ettiğini "
+        "veya bir dosyayı okuduğunu ancak gerçekten yaptıysan söyle. "
+        "Tıbbi ve hukuki konularda sınırlarını açıkla. "
+        "Seçili modül: " + MODULE_CONTEXT.get(module, module) + ". "
+        + SPECIALIST_PROMPTS.get(module, SPECIALIST_PROMPTS["chat"])
     )
 
+    if file_context:
+        prompt = (
+            "Kullanıcının eklediği dosyadan çıkarılan içerik aşağıdadır. "
+            "Yanıtında yalnızca bu içeriği gerçekten destekleyen bilgileri "
+            "dosyaya atfet; dosyanın dışındaki bilgileri ayrıca belirt.\n\n"
+            "DOSYA: " + st.session_state.get("last_uploaded_name", "") +
+            "\nDOSYA İÇERİĞİ:\n" + file_context[:18000] +
+            "\n\nKULLANICININ İSTEĞİ:\n" + prompt
+        )
 
-# =========================================================
-# 7. GROQ CHAT
-# =========================================================
+    messages = [{"role": "system", "content": system_prompt}]
 
-def ask_lidya(prompt, workspace="chat", context="", history=None, lang="en"):
-    if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY is not configured in Streamlit Secrets.")
-
-    client = Groq(api_key=GROQ_API_KEY)
-
-    system = f"""
-You are Lidya AI, a project developed by Şeymanur Acun.
-Do not claim the underlying foundation models were all created by her.
-
-Reply in the user's selected language ({lang}), unless they ask for another.
-Understand mixed-language messages.
-Be clear, thoughtful, accurate, and respectful.
-Do not invent citations, web searches, or actions.
-Do not pretend that you accessed live information when you did not.
-For medical topics, provide educational information, not diagnosis.
-For legal topics, explain that laws vary by jurisdiction.
-
-Workspace instructions:
-{INSTRUCTIONS.get(workspace, INSTRUCTIONS['chat'])}
-"""
-
-    messages = [{"role": "system", "content": system}]
-
-    if history:
-        for item in history[-12:]:
-            if item.get("role") in ("user", "assistant"):
-                content = str(item.get("content", ""))[:9000]
-                if content:
-                    messages.append({
-                        "role": item["role"],
-                        "content": content,
-                    })
-
-    if context:
-        prompt += "\n\nUploaded document content:\n" + context[:25000]
+    for item in (history or [])[-12:]:
+        if item.get("role") in ("user", "assistant"):
+            messages.append({
+                "role": item["role"],
+                "content": item.get("content", "")[:6000],
+            })
 
     messages.append({"role": "user", "content": prompt})
 
-    response = client.chat.completions.create(
-        model=CHAT_MODEL,
-        messages=messages,
-        temperature=0.4,
-        max_tokens=2200,
-    )
+    try:
+        result = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=messages,
+            temperature=0.6,
+            max_tokens=1800,
+        )
+        return result.choices[0].message.content or "Yanıt üretilemedi."
+    except Exception as exc:
+        return f"Yanıt alınırken hata oluştu: {exc}"
 
-    return response.choices[0].message.content or ""
+
+# ---------------------------------------------------------
+# DOSYA OKUMA
+# ---------------------------------------------------------
+
+def read_uploaded_file(uploaded):
+    if uploaded is None:
+        return ""
+
+    name = uploaded.name.lower()
+    data = uploaded.getvalue()
+
+    try:
+        if name.endswith(".pdf"):
+            if PdfReader is None:
+                return "PDF okumak için pypdf paketini requirements.txt dosyasına ekle."
+            reader = PdfReader(io.BytesIO(data))
+            pages = []
+            for page in reader.pages[:60]:
+                pages.append(page.extract_text() or "")
+            return "\n".join(pages)[:25000]
+
+        if name.endswith(".docx"):
+            if Document is None:
+                return "Word okumak için python-docx paketini requirements.txt dosyasına ekle."
+            doc = Document(io.BytesIO(data))
+            return "\n".join(p.text for p in doc.paragraphs)[:25000]
+
+        if name.endswith((".txt", ".md", ".py", ".js", ".html", ".css",
+                          ".json", ".csv", ".xml", ".yaml", ".yml")):
+            return data.decode("utf-8", errors="replace")[:25000]
+
+        if name.endswith((".png", ".jpg", ".jpeg", ".webp")):
+            return (
+                "Bu dosya bir görseldir. Görsel önizleme yapılabilir; "
+                "bu sürüm görseli otomatik olarak görsel-zeka modeline "
+                "göndermez. Görseldeki metni veya içeriği ayrıca yazabilirsin."
+            )
+
+        return "Bu dosya türü henüz desteklenmiyor."
+    except Exception as exc:
+        return f"Dosya okunamadı: {exc}"
 
 
-# =========================================================
-# 8. IMAGE GENERATION
-# =========================================================
+# ---------------------------------------------------------
+# GÖRSEL ÜRETİMİ
+# ---------------------------------------------------------
 
 def generate_image(prompt):
-    if not CF_ACCOUNT_ID or not CF_API_TOKEN:
-        raise RuntimeError("Configure CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.")
+    account_id = (
+        safe_get_secret("CLOUDFLARE_ACCOUNT_ID")
+        or os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
+    )
+    token = (
+        safe_get_secret("CLOUDFLARE_API_TOKEN")
+        or os.getenv("CLOUDFLARE_API_TOKEN", "")
+    )
+
+    if not account_id or not token:
+        st.error(
+            "Görsel üretimi için CLOUDFLARE_ACCOUNT_ID ve "
+            "CLOUDFLARE_API_TOKEN ayarlanmalı."
+        )
+        return None
 
     url = (
-        "https://api.cloudflare.com/client/v4/accounts/"
-        f"{CF_ACCOUNT_ID}/ai/run/{IMAGE_MODEL}"
+        f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
+        "/ai/run/@cf/black-forest-labs/flux-1-schnell"
     )
-
-    response = requests.post(
-        url,
-        headers={
-            "Authorization": f"Bearer {CF_API_TOKEN}",
-            "Content-Type": "application/json",
-        },
-        json={"prompt": prompt[:2000]},
-        timeout=120,
-    )
-
-    if not response.ok:
-        raise RuntimeError(
-            f"Cloudflare HTTP {response.status_code}: {response.text[:300]}"
-        )
-
-    result = response.json()
-    image_data = result.get("result", {}).get("image")
-
-    if not result.get("success") or not image_data:
-        raise RuntimeError("The image service returned no image.")
-
-    raw = base64.b64decode(image_data)
-    return Image.open(io.BytesIO(raw)).convert("RGB")
-
-
-# =========================================================
-# 9. ANIMATED VIDEO FROM IMAGE
-# =========================================================
-
-def animate_image(image, duration=4, fps=12):
-    # This creates a zoom animation, NOT AI text-to-video.
-    image = image.convert("RGB").resize((512, 512))
-    frames = []
-
-    for i in range(duration * fps):
-        progress = i / max(duration * fps - 1, 1)
-        scale = 1.0 + 0.10 * progress
-        crop_w = int(512 / scale)
-        crop_h = int(512 / scale)
-        left = (512 - crop_w) // 2
-        top = (512 - crop_h) // 2
-        frame = image.crop(
-            (left, top, left + crop_w, top + crop_h)
-        ).resize((512, 512))
-        frames.append(np.asarray(frame))
+    headers = {"Authorization": f"Bearer {token}"}
 
     try:
-        import imageio.v2 as imageio
-    except ImportError:
-        raise RuntimeError("Install imageio to create MP4.")
+        response = requests.post(
+            url,
+            headers=headers,
+            json={"prompt": prompt},
+            timeout=120,
+        )
+        response.raise_for_status()
+        payload = response.json()
 
-    path = None
+        result = payload.get("result", {})
+        image_data = result.get("image")
+
+        if image_data:
+            if isinstance(image_data, str):
+                return Image.open(io.BytesIO(base64.b64decode(image_data)))
+            return None
+
+        if "result" in payload and isinstance(payload["result"], dict):
+            return None
+
+        st.error("Görsel hizmetinden beklenen yanıt alınamadı.")
+        return None
+    except Exception as exc:
+        st.error(f"Görsel üretimi başarısız: {exc}")
+        return None
+
+
+# ---------------------------------------------------------
+# SES
+# ---------------------------------------------------------
+
+def transcribe_audio(audio_bytes, filename="recording.wav"):
+    client = groq_client()
+    if client is None:
+        return "Ses yazıya çevrilemedi: Groq API anahtarı ayarlı değil."
+
     try:
-        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
-            path = f.name
-        imageio.mimsave(
-            path, frames, fps=fps, codec="libx264",
-            quality=7, macro_block_size=16,
+        result = client.audio.transcriptions.create(
+            file=(filename, audio_bytes),
+            model="whisper-large-v3",
+            response_format="text",
         )
-        with open(path, "rb") as f:
-            return f.read()
-    finally:
-        if path and os.path.exists(path):
-            try:
-                os.remove(path)
-            except OSError:
-                pass
+        return str(result)
+    except Exception as exc:
+        return f"Ses yazıya çevrilemedi: {exc}"
 
 
-# =========================================================
-# 10. VOICE TRANSCRIPTION
-# =========================================================
+# ---------------------------------------------------------
+# YAN MENÜ
+# ---------------------------------------------------------
 
-def transcribe_audio(audio):
-    if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY is not configured.")
+with st.sidebar:
+    st.markdown("## 💜 Lidya AI")
+    st.caption("Düşün. Öğren. Üret. Keşfet.")
 
-    client = Groq(api_key=GROQ_API_KEY)
-    result = client.audio.transcriptions.create(
-        file=(audio.name or "recording.wav", audio.getvalue()),
-        model="whisper-large-v3-turbo",
-        response_format="text",
+    selected_language = st.selectbox(
+        "🌐 Language / Dil",
+        list(LANGUAGES.keys()),
+        index=list(LANGUAGES.keys()).index(st.session_state.language),
     )
-    return result if isinstance(result, str) else getattr(result, "text", str(result))
+    st.session_state.language = selected_language
 
+    st.markdown("---")
+    st.markdown("### " + ui("settings"))
 
-# =========================================================
-# 11. SIMULATION LAB
-# =========================================================
+    module_labels = {
+        key: ui(key) for key in MODULE_KEYS
+    }
 
-def simulation_lab(t):
-    st.title(t["simulation"])
-    st.write(t["simulation_desc"])
-
-    kinds = [
-        t["projectile"],
-        t["orbit"],
-        t["function"],
-        t["wave"],
-    ]
-
-    kind = st.selectbox(t["sim_type"], kinds)
-
-    if kind == t["projectile"]:
-        a, b, c = st.columns(3)
-        angle = a.slider(t["angle"], 5, 85, 45)
-        velocity = b.slider(t["velocity"], 5, 100, 30)
-        gravity = c.slider(t["gravity"], 1.0, 20.0, 9.81, 0.1)
-
-        theta = np.radians(angle)
-        vx = velocity * np.cos(theta)
-        vy = velocity * np.sin(theta)
-        flight = 2 * vy / gravity
-        time = np.linspace(0, flight, 250)
-        x = vx * time
-        y = np.maximum(vy * time - 0.5 * gravity * time**2, 0)
-
-        fig, ax = plt.subplots()
-        ax.plot(x, y)
-        ax.set_xlabel("Distance (m)")
-        ax.set_ylabel("Height (m)")
-        ax.set_title("Ideal projectile trajectory")
-        ax.grid(True)
-        st.pyplot(fig)
-        plt.close(fig)
-
-        st.subheader(t["result"])
-        st.write(f"Maximum height: **{vy**2 / (2 * gravity):.2f} m**")
-        st.write(f"Horizontal range: **{vx * flight:.2f} m**")
-        st.write(f"Flight time: **{flight:.2f} s**")
-        st.caption("Ideal model; air resistance is not included.")
-
-    elif kind == t["orbit"]:
-        radius = st.slider("Orbital radius", 2, 20, 8)
-        period = st.slider("Orbital period", 2, 30, 12)
-        time_value = st.slider(
-            "Simulation time", 0.0, float(period), 3.0, 0.25
-        )
-
-        theta = np.linspace(0, 2 * np.pi, 400)
-        angle = 2 * np.pi * time_value / period
-
-        fig, ax = plt.subplots()
-        ax.plot(radius * np.cos(theta), radius * np.sin(theta), "--")
-        ax.scatter([0], [0], s=200, label="Central body")
-        ax.scatter(
-            [radius * np.cos(angle)],
-            [radius * np.sin(angle)],
-            s=90, label="Orbiting body",
-        )
-        ax.set_aspect("equal", adjustable="box")
-        ax.grid(True)
-        ax.legend()
-        ax.set_title("Simplified circular orbit")
-        st.pyplot(fig)
-        plt.close(fig)
-
-        st.caption("Illustrative model, not an astronomical prediction.")
-
-    elif kind == t["function"]:
-        func = st.selectbox(
-            "Function",
-            ["y = x²", "y = x³", "y = sin(x)", "y = cos(x)",
-             "y = 2x + 1", "y = |x|"],
-        )
-        x = np.linspace(-10, 10, 500)
-        funcs = {
-            "y = x²": x**2,
-            "y = x³": x**3,
-            "y = sin(x)": np.sin(x),
-            "y = cos(x)": np.cos(x),
-            "y = 2x + 1": 2*x + 1,
-            "y = |x|": np.abs(x),
-        }
-
-        fig, ax = plt.subplots()
-        ax.plot(x, funcs[func])
-        ax.axhline(0, linewidth=0.8)
-        ax.axvline(0, linewidth=0.8)
-        ax.grid(True)
-        ax.set_title(func)
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
-        st.pyplot(fig)
-        plt.close(fig)
-
-    else:
-        a, b = st.columns(2)
-        amplitude = a.slider(t["amplitude"], 0.1, 5.0, 1.0, 0.1)
-        frequency = b.slider(t["frequency"], 0.1, 5.0, 1.0, 0.1)
-        phase = st.slider("Phase", 0.0, 6.28, 0.0, 0.1)
-        x = np.linspace(0, 4*np.pi, 600)
-        y = amplitude * np.sin(frequency*x + phase)
-
-        fig, ax = plt.subplots()
-        ax.plot(x, y)
-        ax.grid(True)
-        ax.set_xlabel("Position")
-        ax.set_ylabel("Amplitude")
-        ax.set_title("Sine wave")
-        st.pyplot(fig)
-        plt.close(fig)
-
-
-# =========================================================
-# 12. UNIVERSITY RESEARCH LINKS
-# =========================================================
-
-UNIVERSITIES = {
-    "Harvard University": "https://college.harvard.edu/",
-    "University of Oxford": "https://www.ox.ac.uk/admissions/undergraduate",
-    "University of Cambridge": "https://www.undergraduate.study.cam.ac.uk/",
-    "Massachusetts Institute of Technology": "https://mitadmissions.org/",
-    "Yale University": "https://admissions.yale.edu/",
-    "Columbia University": "https://undergrad.admissions.columbia.edu/",
-    "Princeton University": "https://admission.princeton.edu/",
-    "Stanford University": "https://admission.stanford.edu/",
-}
-
-
-# =========================================================
-# 13. LANGUAGE AND SIDEBAR
-# =========================================================
-
-language_options = list(LANGUAGES.keys())
-
-if "language_name" not in st.session_state:
-    st.session_state.language_name = language_options[0]
-
-selected_language = st.sidebar.selectbox(
-    "🌐 Dil / Language / Langue",
-    language_options,
-    index=language_options.index(st.session_state.language_name),
-    key="language_selector",
-)
-
-st.session_state.language_name = selected_language
-lang = LANGUAGES[selected_language]
-t = UI[lang]
-
-if lang == "ar":
-    st.markdown(
-        "<style>.stApp,[data-testid='stSidebar']{direction:rtl;text-align:right}</style>",
-        unsafe_allow_html=True,
+    chosen_key = st.radio(
+        "Modüller",
+        MODULE_KEYS,
+        index=MODULE_KEYS.index(st.session_state.module),
+        format_func=lambda key: (
+            "🏠 " + module_labels[key] if key == "home"
+            else module_labels[key]
+        ),
+        label_visibility="collapsed",
     )
-else:
+    st.session_state.module = chosen_key
+
+    st.markdown("---")
+    st.caption("🕒 " + tr_now() + " · Türkiye")
+
+    if st.button("🧹 " + ui("clear"), use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+
+
+# ---------------------------------------------------------
+# ANA EKRAN
+# ---------------------------------------------------------
+
+module = st.session_state.module
+
+if module == "home":
     st.markdown(
-        "<style>.stApp,[data-testid='stSidebar']{direction:ltr;text-align:left}</style>",
-        unsafe_allow_html=True,
-    )
-
-st.sidebar.markdown("---")
-st.sidebar.subheader(t["workspace"])
-
-selected = st.sidebar.radio(
-    t["workspace"],
-    WORKSPACES,
-    format_func=lambda key: t.get(key, UI["en"].get(key, key)),
-    label_visibility="collapsed",
-    key="workspace_selector",
-)
-
-if st.sidebar.button(t["new"], use_container_width=True):
-    st.session_state.messages = []
-    st.session_state.last_answer = ""
-    st.rerun()
-
-if st.sidebar.button(t["clear"], use_container_width=True):
-    st.session_state.messages = []
-    st.session_state.last_answer = ""
-    st.rerun()
-
-st.sidebar.markdown("---")
-
-if not GROQ_API_KEY:
-    st.sidebar.warning(t["missing_key"])
-
-if not CF_ACCOUNT_ID or not CF_API_TOKEN:
-    st.sidebar.info(t["missing_cf"])
-
-st.sidebar.caption(t["notice"])
-
-
-# =========================================================
-# 14. CLEAN LANDING SCREEN
-# =========================================================
-
-st.markdown(
-    f"""
-    <div class="lidya-header">
-        <div class="lidya-orb"></div>
-        <div class="lidya-title">💜 LIDYA AI</div>
-        <div class="lidya-subtitle">{t["tagline"]}</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-st.caption(f"🕒 {t['timestamp']}: {timestamp()}")
-
-if not st.session_state.messages and selected == "chat":
-    st.markdown(
-        f"""
-        <div class="lidya-card" style="text-align:center;">
-            <h3>{t["welcome"]}</h3>
-            <p>Lidya AI · Built with curiosity and Python.</p>
+        """
+        <div class="lidya-hero">
+            <div class="lidya-title">💜 Lidya AI</div>
+            <div class="lidya-subtitle">
+                Düşün. Öğren. Üret. Keşfet.
+            </div>
+            <p class="small-muted">
+                Built with curiosity and Python.
+            </p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    # Workspace cards intentionally omitted:
-    # the sidebar already contains the workspace list.
+    st.markdown("### " + ui("welcome"))
+    st.write(
+        "Lidya'nın bütün çalışma alanlarına sol menüden ulaşabilirsin. "
+        "Bir modül seçerek sohbete, araştırmaya, dosya analizine veya "
+        "simülasyonlara başlayabilirsin."
+    )
+    st.info(
+        "Not: Bazı özellikler API anahtarı ve internet bağlantısı gerektirir. "
+        "Canlı web araştırması, kalıcı kullanıcı hafızası ve gerçek metinden "
+        "video üretimi bu temel sürümde otomatik olarak sağlanmaz."
+    )
 
 
-# =========================================================
-# 15. CHAT WORKSPACE
-# =========================================================
+# ---------------------------------------------------------
+# ÜNİVERSİTE KEŞFİ
+# ---------------------------------------------------------
 
-if selected not in ("file", "image", "video", "sim", "university", "karaoke"):
+elif module == "universities":
+    st.title("🎓 " + ui("universities"))
+    st.write(
+        "Üniversite isimlerinin yanındaki simgeler, ilgili sitelerin "
+        "favicon'larıdır. Kabul koşulları, sınav politikaları ve son tarihler "
+        "değişebildiğinden resmî kabul sayfasını kontrol et."
+    )
 
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            if message.get("timestamp"):
-                st.caption("🕒 " + message["timestamp"])
+    search = st.text_input("Üniversite ara")
+    filtered = [
+        uni for uni in UNIVERSITIES
+        if search.lower() in uni["name"].lower()
+    ]
 
-    prompt = st.chat_input(t["prompt"])
-
-    if prompt:
-        now = timestamp()
-        st.session_state.messages.append({
-            "role": "user",
-            "content": prompt,
-            "timestamp": now,
-        })
-
-        with st.chat_message("user"):
-            st.markdown(prompt)
-            st.caption("🕒 " + now)
-
-        with st.chat_message("assistant"):
-            with st.spinner(t["thinking"]):
-                try:
-                    answer = ask_lidya(
-                        prompt,
-                        workspace=selected,
-                        history=st.session_state.messages[:-1],
-                        lang=lang,
+    for start in range(0, len(filtered), 2):
+        cols = st.columns(2)
+        for offset, uni in enumerate(filtered[start:start + 2]):
+            with cols[offset]:
+                st.markdown('<div class="university-card">', unsafe_allow_html=True)
+                a, b = st.columns([1, 4])
+                with a:
+                    icon_url = (
+                        "https://www.google.com/s2/favicons?domain="
+                        + uni["domain"] + "&sz=128"
                     )
-                    st.markdown(answer)
-                    answer_time = timestamp()
-                    st.caption("🕒 " + answer_time)
+                    st.image(icon_url, width=52)
+                with b:
+                    st.markdown("#### " + uni["name"])
+                    st.markdown(
+                        f"[Resmî site]({uni['site']}) · "
+                        f"[Lisans başvuruları]({uni['admissions']})"
+                    )
+                st.markdown("</div>", unsafe_allow_html=True)
 
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": answer,
-                        "timestamp": answer_time,
-                    })
-                    st.session_state.last_answer = answer
-                except Exception as exc:
-                    st.error(f"{type(exc).__name__}: {exc}")
+    st.markdown("---")
+    st.subheader("Karşılaştırma ve planlama")
+    st.write(
+        "Üniversiteleri karşılaştırırken bölüm, başvuru takvimi, sınav "
+        "gereklilikleri, maddi yardım, dil yeterliliği ve uluslararası "
+        "öğrenci politikalarını her üniversitenin resmî sayfasından kontrol et."
+    )
+    comparison = st.multiselect(
+        "Karşılaştırmak istediğin üniversiteleri seç",
+        [u["name"] for u in UNIVERSITIES],
+    )
+    if comparison:
+        for uni in UNIVERSITIES:
+            if uni["name"] in comparison:
+                st.markdown(
+                    f"- **{uni['name']}** — "
+                    f"[Resmî kabul bilgileri]({uni['admissions']})"
+                )
+
+    st.caption(
+        "Bu bölüm şu anda canlı başvuru koşullarını otomatik taramaz; "
+        "bağlantılar üniversitelerin resmî sitelerine gider."
+    )
 
 
-# =========================================================
-# 16. FILE LABORATORY
-# =========================================================
+# ---------------------------------------------------------
+# DOSYA LABORATUVARI
+# ---------------------------------------------------------
 
-elif selected == "file":
-    st.title(t["file"])
+elif module == "file":
+    st.title("📁 " + ui("file"))
+    st.write("PDF, Word, TXT, Markdown, CSV, JSON ve kod dosyalarını yükleyebilirsin.")
 
     uploaded = st.file_uploader(
-        t["upload"],
-        type=[
-            "pdf", "docx", "txt", "md", "csv", "json",
-            "py", "js", "html", "css", "xml", "yaml",
-            "yml", "toml", "sql",
+        ui("upload"),
+        type=["pdf", "docx", "txt", "md", "csv", "json", "py", "js",
+              "html", "css", "xml", "yaml", "yml", "png", "jpg", "jpeg", "webp"],
+        key="file_lab_upload",
+    )
+
+    if uploaded:
+        st.session_state.last_uploaded_name = uploaded.name
+        st.session_state.last_uploaded_text = read_uploaded_file(uploaded)
+        st.success(f"Dosya alındı: {uploaded.name}")
+        if uploaded.name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+            st.image(uploaded, caption=uploaded.name, use_container_width=True)
+        with st.expander("Çıkarılan içeriği görüntüle"):
+            st.text(st.session_state.last_uploaded_text[:12000])
+
+    task = st.text_area(
+        "Dosya hakkında ne yapmamı istersin?",
+        placeholder="Özetle, önemli noktaları çıkar, tabloyu açıkla...",
+        height=110,
+    )
+
+    if st.button(ui("analyze"), type="primary"):
+        if not uploaded:
+            st.warning("Önce bir dosya yükle.")
+        elif not task.strip():
+            st.warning("Dosyayla ilgili isteğini yaz.")
+        else:
+            with st.spinner("Dosya inceleniyor..."):
+                answer = ask_lidya(
+                    task,
+                    module="chat",
+                    history=[],
+                    file_context=st.session_state.last_uploaded_text,
+                )
+            st.markdown(answer)
+
+
+# ---------------------------------------------------------
+# GÖRSEL ATÖLYESİ
+# ---------------------------------------------------------
+
+elif module == "image":
+    st.title("🎨 " + ui("image"))
+    st.write("Bir görsel için ayrıntılı metin istemi oluştur veya API ile görsel üret.")
+    prompt = st.text_area(
+        ui("prompt"),
+        placeholder="Örneğin: İnsan hücresinin bilimsel, etiketli eğitim illüstrasyonu...",
+        height=120,
+    )
+
+    if st.button("🖼️ " + ui("generate"), type="primary"):
+        if not prompt.strip():
+            st.warning("Önce bir açıklama yaz.")
+        else:
+            with st.spinner("Görsel oluşturuluyor..."):
+                image_result = generate_image(prompt)
+            if image_result:
+                st.image(image_result, caption="Lidya AI tarafından oluşturulan görsel")
+                buffer = io.BytesIO()
+                image_result.save(buffer, format="PNG")
+                st.download_button(
+                    "PNG olarak indir",
+                    data=buffer.getvalue(),
+                    file_name="lidya_ai_image.png",
+                    mime="image/png",
+                )
+
+
+# ---------------------------------------------------------
+# VİDEO ATÖLYESİ
+# ---------------------------------------------------------
+
+elif module == "video":
+    st.title("🎬 " + ui("video"))
+    st.info(
+        "Bu bölümde tek bir görselden basit yakınlaşma animasyonu üretilebilir. "
+        "Bu özellik, metinden gerçekçi yeni video üreten bir model değildir."
+    )
+    video_image = st.file_uploader(
+        "Animasyon için bir görsel yükle",
+        type=["png", "jpg", "jpeg", "webp"],
+        key="video_image",
+    )
+    zoom_seconds = st.slider("Süre (saniye)", 2, 8, 4)
+
+    if st.button("Animasyon oluştur", type="primary"):
+        if not video_image:
+            st.warning("Önce bir görsel yükle.")
+        else:
+            try:
+                original = Image.open(video_image).convert("RGB")
+                frames = []
+                width, height = original.size
+                frame_count = zoom_seconds * 8
+
+                for i in range(frame_count):
+                    scale = 1 + (0.12 * i / max(1, frame_count - 1))
+                    new_w, new_h = int(width * scale), int(height * scale)
+                    enlarged = original.resize((new_w, new_h))
+                    left = max(0, (new_w - width) // 2)
+                    top = max(0, (new_h - height) // 2)
+                    frame = enlarged.crop((left, top, left + width, top + height))
+                    frames.append(np.array(frame))
+
+                import imageio.v2 as imageio
+                with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp:
+                    video_path = temp.name
+
+                imageio.mimsave(video_path, frames, fps=8, codec="libx264")
+                with open(video_path, "rb") as file_handle:
+                    video_bytes = file_handle.read()
+
+                st.video(video_bytes)
+                st.download_button(
+                    "MP4 videosunu indir",
+                    data=video_bytes,
+                    file_name="lidya_zoom_animation.mp4",
+                    mime="video/mp4",
+                )
+            except Exception as exc:
+                st.error(
+                    "Animasyon oluşturulamadı. imageio-ffmpeg kurulumunu "
+                    f"kontrol et. Ayrıntı: {exc}"
+                )
+
+
+# ---------------------------------------------------------
+# SİMÜLASYON LABORATUVARI
+# ---------------------------------------------------------
+
+elif module == "sim":
+    st.title("🪐 " + ui("sim"))
+    sim_type = st.selectbox(
+        "Simülasyon seç",
+        [
+            "Fonksiyon grafiği",
+            "Mermi hareketi",
+            "Dalga hareketi",
+            "Basit yörünge modeli",
         ],
     )
 
-    question = st.text_area(
-        t["question"],
-        value=(
-            "Bu dosyayı özetle, önemli noktaları açıkla ve varsa hataları belirt."
-            if lang == "tr"
-            else "Summarize this file, explain key points, and identify possible issues."
-        ),
-    )
-
-    if st.button(t["analyze"], use_container_width=True):
-        if not uploaded:
-            st.warning("Please upload a file first.")
-        elif not GROQ_API_KEY:
-            st.error(t["missing_key"])
-        else:
-            try:
-                content = read_file(uploaded)
-                if not content.strip():
-                    st.warning("No readable text was found.")
-                else:
-                    with st.spinner(t["thinking"]):
-                        answer = ask_lidya(
-                            question, "file", context=content, lang=lang
-                        )
-                    st.markdown(answer)
-                    st.session_state.last_answer = answer
-            except Exception as exc:
-                st.error(f"File analysis failed: {exc}")
-
-
-# =========================================================
-# 17. IMAGE STUDIO
-# =========================================================
-
-elif selected == "image":
-    st.title(t["image"])
-    prompt = st.text_area(t["image_prompt"], height=130)
-
-    if st.button(t["make_image"], use_container_width=True):
-        if not prompt.strip():
-            st.warning(t["image_prompt"])
-        else:
-            try:
-                with st.spinner(t["thinking"]):
-                    image = generate_image(prompt)
-                st.session_state.generated_image = image
-            except Exception as exc:
-                st.error(f"Image generation failed: {exc}")
-
-    if st.session_state.generated_image is not None:
-        image = st.session_state.generated_image
-        st.image(image, use_container_width=True)
-        buffer = io.BytesIO()
-        image.save(buffer, format="PNG")
-        st.download_button(
-            "⬇️ PNG",
-            buffer.getvalue(),
-            "lidya_image.png",
-            "image/png",
+    if sim_type == "Fonksiyon grafiği":
+        expression = st.selectbox(
+            "Fonksiyon",
+            ["x²", "sin(x)", "cos(x)", "x³ - 2x", "eˣ"],
         )
+        x = np.linspace(-10, 10, 500)
+        y = {
+            "x²": x ** 2,
+            "sin(x)": np.sin(x),
+            "cos(x)": np.cos(x),
+            "x³ - 2x": x ** 3 - 2 * x,
+            "eˣ": np.exp(np.clip(x, -10, 5)),
+        }[expression]
+        st.line_chart({"y": y}, x_label="Örnek noktalar", y_label="f(x)")
+
+    elif sim_type == "Mermi hareketi":
+        angle = st.slider("Atış açısı (derece)", 10, 80, 45)
+        speed = st.slider("Başlangıç hızı (m/s)", 5, 100, 30)
+        gravity = 9.81
+        rad = np.radians(angle)
+        vx = speed * np.cos(rad)
+        vy = speed * np.sin(rad)
+        flight_time = 2 * vy / gravity
+        t = np.linspace(0, flight_time, 250)
+        x = vx * t
+        y = vy * t - 0.5 * gravity * t ** 2
+        st.line_chart({"Yükseklik (m)": y}, x_label="Zaman örnekleri")
+        st.write(f"İdeal modelde yaklaşık menzil: **{x[-1]:.1f} m**")
+        st.caption("Hava direnci ve arazi yüksekliği hesaba katılmamıştır.")
+
+    elif sim_type == "Dalga hareketi":
+        amplitude = st.slider("Genlik", 1, 10, 4)
+        frequency = st.slider("Frekans", 1, 10, 2)
+        x = np.linspace(0, 4 * np.pi, 400)
+        y = amplitude * np.sin(frequency * x)
+        st.line_chart({"Dalga": y}, x_label="Konum örnekleri")
+
+    else:
+        radius = st.slider("Yörünge yarıçapı (temsili)", 1, 10, 5)
+        theta = np.linspace(0, 2 * np.pi, 360)
+        x = radius * np.cos(theta)
+        y = radius * np.sin(theta)
+        st.pyplot(plt.figure())
+        fig, ax = plt.subplots()
+        ax.plot(x, y)
+        ax.scatter([0], [0])
+        ax.set_aspect("equal", adjustable="box")
+        ax.set_title("Basitleştirilmiş dairesel yörünge")
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        st.pyplot(fig)
+        plt.close(fig)
+        st.caption("Bu çizim fiziksel olarak tam bir yörünge simülatörü değildir.")
 
 
-# =========================================================
-# 18. VIDEO STUDIO
-# =========================================================
+# ---------------------------------------------------------
+# SES VE KARAOKE
+# ---------------------------------------------------------
 
-elif selected == "video":
-    st.title(t["video"])
-    st.info(
-        "This tool creates a short zoom animation from an AI-generated image. "
-        "It is not true text-to-video generation."
-    )
-    prompt = st.text_area(t["video_prompt"], height=120)
-
-    if st.button(t["make_video"], use_container_width=True):
-        if not prompt.strip():
-            st.warning(t["video_prompt"])
-        else:
-            try:
-                with st.spinner(t["thinking"]):
-                    image = generate_image(prompt)
-                    st.session_state.generated_image = image
-                    st.session_state.generated_video = animate_image(image)
-            except Exception as exc:
-                st.error(f"Video creation failed: {exc}")
-
-    if st.session_state.generated_video:
-        st.video(st.session_state.generated_video)
-        st.download_button(
-            "⬇️ Download MP4",
-            st.session_state.generated_video,
-            "lidya_video.mp4",
-            "video/mp4",
-        )
-
-
-# =========================================================
-# 19. SIMULATION LAB
-# =========================================================
-
-elif selected == "sim":
-    simulation_lab(t)
-
-
-# =========================================================
-# 20. UNIVERSITY RESEARCH
-# =========================================================
-
-elif selected == "university":
-    st.title(t["university"])
+elif module == "karaoke":
+    st.title("🎤 " + ui("karaoke"))
     st.write(
-        "Üniversitelerin kabul koşullarını ve programlarını resmî "
-        "kaynaklardan kontrol etmek için aşağıdaki bağlantıları kullan."
-        if lang == "tr"
-        else "Use the official university websites below to verify admissions requirements and programs."
+        "Kendi ses kaydını yapabilir, desteklenen ses dosyalarını dinleyebilir "
+        "ve kaydını yazıya çevirebilirsin. Telifli şarkı sözleri veya "
+        "altyapılar uygulamaya gömülü değildir."
     )
 
-    for name, url in UNIVERSITIES.items():
-        st.markdown(f"**[{name}]({url})**")
-
-    st.caption(t["not_live"])
-
-    research_question = st.text_area(
-        t["research"],
-        placeholder=(
-            "Örnek: Uluslararası öğrenciler için lisans başvuru koşulları ve maddi yardım."
-            if lang == "tr"
-            else "Example: Undergraduate requirements and financial aid for international applicants."
-        ),
+    audio_file = st.file_uploader(
+        "Bir ses dosyası yükle",
+        type=["wav", "mp3", "m4a", "ogg", "flac"],
+        key="karaoke_upload",
     )
+    if audio_file:
+        st.audio(audio_file)
+        if st.button("Ses dosyasını yazıya çevir"):
+            with st.spinner("Ses yazıya çevriliyor..."):
+                transcript = transcribe_audio(
+                    audio_file.getvalue(), audio_file.name
+                )
+            st.text_area("Transkripsiyon", transcript, height=180)
 
-    if st.button(t["research_button"], use_container_width=True):
-        if not research_question.strip():
-            st.warning(t["research"])
-        elif not GROQ_API_KEY:
-            st.error(t["missing_key"])
-        else:
-            with st.spinner(t["thinking"]):
-                try:
-                    answer = ask_lidya(
-                        "Help me plan research on this question: "
-                        + research_question
-                        + "\nProvide a checklist of facts to verify and relevant official websites. "
-                          "Do not pretend to have checked current pages.",
-                        workspace="university",
-                        lang=lang,
-                    )
-                    st.markdown(answer)
-                    st.session_state.last_answer = answer
-                except Exception as exc:
-                    st.error(str(exc))
+    st.markdown("### Mikrofon kaydı")
+    mic = st.audio_input("Sesini kaydet")
+    if mic:
+        st.audio(mic)
+        if st.button("Kaydı yazıya çevir"):
+            with st.spinner("Kayıt işleniyor..."):
+                transcript = transcribe_audio(mic.getvalue(), "recording.wav")
+            st.text_area("Kaydının metni", transcript, height=180)
 
-
-# =========================================================
-# 21. SONG AND AUDIO LAB
-# =========================================================
-
-elif selected == "karaoke":
-    st.title(t["karaoke"])
-    st.info(t["karaoke_help"])
-
-    audio = st.file_uploader(
-        t["upload"],
-        type=["wav", "mp3", "m4a", "ogg"],
-    )
-
-    if audio:
-        st.audio(audio)
-        st.download_button(
-            "⬇️ Download audio",
-            audio.getvalue(),
-            audio.name,
-            audio.type or "audio/mpeg",
+    st.markdown("### Metni sesli dinle")
+    tts_text = st.text_area("Okunacak metin", key="tts_text")
+    if tts_text:
+        escaped = json.dumps(tts_text, ensure_ascii=False)
+        st.components.v1.html(
+            f"""
+            <button onclick='speakText()'
+            style='padding:10px 16px;border-radius:10px;cursor:pointer;'>
+            🔊 Metni sesli oku
+            </button>
+            <button onclick='window.speechSynthesis.cancel()'
+            style='padding:10px 16px;border-radius:10px;cursor:pointer;'>
+            ⏹ Durdur
+            </button>
+            <script>
+            function speakText() {{
+                const text = {escaped};
+                const utterance = new SpeechSynthesisUtterance(text);
+                window.speechSynthesis.speak(utterance);
+            }}
+            </script>
+            """,
+            height=75,
         )
 
-    st.subheader("Vocal practice")
-    practice_text = st.text_area(
-        "Practice notes",
-        placeholder="Record the song title, pronunciation goals, breathing notes, or your practice plan.",
+
+# ---------------------------------------------------------
+# LIDYA HAFIZASI
+# ---------------------------------------------------------
+
+elif module == "memory":
+    st.title("🧠 " + ui("memory"))
+    st.warning(
+        "Bu hafıza yalnızca mevcut Streamlit oturumu boyunca tutulur. "
+        "Sayfa yenilenmesi veya oturumun sona ermesi durumunda kaybolabilir. "
+        "Kalıcı, kullanıcıya özel hafıza için veritabanı ve kullanıcı hesabı gerekir."
     )
 
-    if st.button("Save practice notes"):
-        if practice_text.strip():
-            st.session_state.memory_items.append({
-                "type": "practice",
-                "text": practice_text.strip(),
-                "time": timestamp(),
-            })
-            st.success("Practice notes saved for this session.")
-
-
-# =========================================================
-# 22. SESSION MEMORY
-# =========================================================
-
-st.markdown("---")
-st.subheader(t["memory"])
-
-with st.expander(t["remember"], expanded=False):
-    memory_text = st.text_area(
-        "Memory note",
-        placeholder=(
-            "Örneğin: Bu projede şu hedefe odaklanıyorum."
-            if lang == "tr"
-            else "For example: This is the goal I am working toward."
-        ),
-        key="memory_input",
+    memory_text = st.text_input(
+        ui("remember"),
+        placeholder="Örneğin: Projemin adı Lidya AI.",
     )
-
-    if st.button("Save memory note"):
+    if st.button("Hafızaya ekle"):
         if memory_text.strip():
             st.session_state.memory_items.append({
-                "type": "note",
                 "text": memory_text.strip(),
-                "time": timestamp(),
+                "time": tr_now(),
             })
-            st.success("Saved for the current session.")
+            st.success("Bu oturumun hafızasına eklendi.")
 
-if st.session_state.memory_items:
-    for i, item in enumerate(st.session_state.memory_items):
-        st.write(f"**{i + 1}.** {item['text']}")
-        st.caption(item["time"])
+    st.subheader(ui("show_memory"))
+    if st.session_state.memory_items:
+        for index, item in enumerate(st.session_state.memory_items, 1):
+            st.write(f"{index}. {item['text']}  ·  {item['time']}")
+    else:
+        st.caption("Bu oturumda henüz kaydedilmiş bir bilgi yok.")
 
-    if st.button("Clear session memory"):
+    if st.button(ui("clear_memory")):
         st.session_state.memory_items = []
-        st.rerun()
-
-st.caption(
-    "Session memory is temporary. It is not a permanent, account-linked database."
-)
+        st.success("Oturum hafızası temizlendi.")
 
 
-# =========================================================
-# 23. VOICE RECORDING AND TRANSCRIPTION
-# =========================================================
+# ---------------------------------------------------------
+# AYARLAR
+# ---------------------------------------------------------
 
-st.markdown("---")
-st.subheader(t["voice"])
-
-audio_input = st.audio_input(t["voice"])
-
-if audio_input is not None:
-    st.audio(audio_input)
-
-    if st.button(t["transcribe"]):
-        if not GROQ_API_KEY:
-            st.error(t["missing_key"])
-        else:
-            try:
-                with st.spinner(t["thinking"]):
-                    st.session_state.transcript = transcribe_audio(audio_input)
-            except Exception as exc:
-                st.error(f"Transcription failed: {exc}")
-
-if st.session_state.transcript:
-    transcript = st.text_area(
-        "Transcript",
-        value=st.session_state.transcript,
-        key="transcript_edit",
+elif module == "settings":
+    st.title("⚙️ " + ui("settings"))
+    st.write("### API bağlantı durumu")
+    st.write("Groq:", "Bağlı görünüyor" if groq_client() else "API anahtarı ayarlanmamış")
+    st.write(
+        "Cloudflare görsel API:",
+        "Ayarlandı" if (CF_ACCOUNT_ID and CF_API_TOKEN) else "API bilgileri eksik",
+    )
+    st.write("Arayüz dili:", st.session_state.language)
+    st.write("Türkiye saati:", tr_now())
+    st.info(
+        "API anahtarlarını kodun içine yazma. Streamlit Cloud Secrets "
+        "bölümünde sakla."
     )
 
-    if st.button(t["send"], key="send_transcript"):
-        if transcript.strip() and GROQ_API_KEY:
-            try:
+
+# ---------------------------------------------------------
+# DİĞER SOHBET MODÜLLERİ
+# ---------------------------------------------------------
+
+elif module in SPECIALIST_PROMPTS:
+    st.title("💜 " + ui(module))
+    st.caption("🕒 " + tr_now() + " · Türkiye saati")
+
+    # Dosya, konuşma modüllerinde de isteğe bağlı olarak eklenebilir.
+    uploaded = st.file_uploader(
+        "İstersen bu mesaja dosya ekle",
+        type=["pdf", "docx", "txt", "md", "csv", "json", "py", "js",
+              "html", "css", "xml", "yaml", "yml"],
+        key=f"chat_upload_{module}",
+    )
+
+    if uploaded:
+        st.session_state.last_uploaded_name = uploaded.name
+        st.session_state.last_uploaded_text = read_uploaded_file(uploaded)
+        st.caption(f"Eklenen dosya: {uploaded.name}")
+
+    for item in st.session_state.messages:
+        if item.get("module") != module:
+            continue
+        with st.chat_message(item["role"]):
+            st.markdown(item["content"])
+            st.caption(item.get("time", ""))
+
+    prompt = st.chat_input(ui("send"))
+
+    if prompt:
+        if any(
+            word in prompt.lower()
+            for word in ["who designed you", "who created you",
+                         "seni kim yaptı", "seni kim geliştirdi",
+                         "seni kim tasarladı"]
+        ):
+            answer = (
+                "Lidya AI projesini Şeymanur Acun geliştirdi. "
+                "Lidya'nın kullandığı temel yapay zekâ modeli ve diğer "
+                "hizmetler ise ilgili sağlayıcılar tarafından geliştirilmiştir."
+            )
+        else:
+            prior = [
+                item for item in st.session_state.messages
+                if item.get("module") == module
+            ]
+            with st.spinner("Lidya düşünüyor..."):
                 answer = ask_lidya(
-                    transcript,
-                    workspace=selected,
-                    history=st.session_state.messages[-12:],
-                    lang=lang,
+                    prompt,
+                    module=module,
+                    history=prior,
+                    file_context=st.session_state.get("last_uploaded_text", ""),
                 )
-                st.session_state.messages.extend([
-                    {
-                        "role": "user",
-                        "content": transcript,
-                        "timestamp": timestamp(),
-                    },
-                    {
-                        "role": "assistant",
-                        "content": answer,
-                        "timestamp": timestamp(),
-                    },
-                ])
-                st.session_state.last_answer = answer
-                st.markdown(answer)
-            except Exception as exc:
-                st.error(str(exc))
+
+        st.session_state.messages.append({
+            "role": "user",
+            "content": prompt,
+            "time": tr_now(),
+            "module": module,
+        })
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": answer,
+            "time": tr_now(),
+            "module": module,
+        })
+        st.rerun()
 
 
-# =========================================================
-# 24. READ ANSWER ALOUD
-# =========================================================
+# ---------------------------------------------------------
+# ALT BİLGİ
+# ---------------------------------------------------------
 
-if st.session_state.last_answer:
-    if st.button(t["read"]):
-        voice_languages = {
-            "tr": "tr-TR", "en": "en-US", "fr": "fr-FR",
-            "de": "de-DE", "es": "es-ES", "it": "it-IT",
-            "ja": "ja-JP", "zh": "zh-CN", "ar": "ar-SA",
-        }
-
-        speech_text = json.dumps(st.session_state.last_answer)
-        speech_lang = json.dumps(voice_languages.get(lang, "en-US"))
-
-        component_html = f"""
-        <button onclick="speakLidya()" style="
-          padding:12px 18px;border-radius:12px;
-          border:1px solid #b99ae8;background:#302044;color:white;">
-          {t["read"]}
-        </button>
-        <script>
-          function speakLidya() {{
-            if (!window.speechSynthesis) {{
-              alert("Speech synthesis is unavailable in this browser.");
-              return;
-            }}
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance({speech_text});
-            utterance.lang = {speech_lang};
-            utterance.rate = 0.95;
-            window.speechSynthesis.speak(utterance);
-          }}
-        </script>
-        """
-
-        st.components.v1.html(component_html, height=70)
-
-
-# =========================================================
-# 25. FOOTER
-# =========================================================
-
-st.markdown(
-    f"""
-    <div class="lidya-footer">
-      💜 Lidya AI · {t["tagline"]}
-      <br>Built with curiosity and Python.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+st.markdown("---")
+st.caption("💜 Lidya AI · Built with curiosity and Python.")
