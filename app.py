@@ -4,6 +4,8 @@ import io
 import math
 import re
 import time
+import uuid
+import hashlib
 import urllib.parse
 import requests
 from PIL import Image, ImageDraw, ImageFont
@@ -56,6 +58,7 @@ MODULES = {
     "📐 Mathematics": ("Mathematics", "Solve math problems carefully and explain steps."),
     "⚙️ Engineering": ("Engineering", "Explain engineering principles and calculations."),
     "📚 Education": ("Education", "Create learning plans, explanations and study activities."),
+    "🎓 University & Admissions": ("University & Admissions", "Research universities, admissions requirements, scholarships, financial aid, essays, applications, professor outreach and application planning. Clearly distinguish official verified information from general guidance."),
     "📊 Business & Economics": ("Business & Economics", "Explain business, economics and data concepts."),
     "✍️ Writing & Creativity": ("Writing & Creativity", "Help brainstorm, write, revise and edit original text."),
     "📈 Data Analysis": ("Data Analysis", "Help interpret data and explain analysis methods."),
@@ -76,6 +79,7 @@ MODULE_LABELS = {
         "📐 Mathematics": "📐 Matematik",
         "⚙️ Engineering": "⚙️ Mühendislik",
         "📚 Education": "📚 Eğitim",
+        "🎓 University & Admissions": "🎓 Üniversite ve Başvurular",
         "📊 Business & Economics": "📊 İşletme ve Ekonomi",
         "✍️ Writing & Creativity": "✍️ Yazma ve Yaratıcılık",
         "📈 Data Analysis": "📈 Veri Analizi",
@@ -308,13 +312,18 @@ Provide general legal information, not legal representation. Ask which jurisdict
 
 SMART DEVICES:
 This app does not directly control physical devices. Never claim a device was activated or changed.
+
+UNIVERSITY & ADMISSIONS:
+Help with university discovery, admissions planning, scholarships, financial aid, essays, outreach and deadlines. For current requirements, use live search results when enabled and prioritize official university pages. Never guarantee admission, scholarships, or funding.
 """
 
 # ======================================================
 # 6. SESSION STATE + FILE UTILITIES
 # ======================================================
-if "messages_by_module" not in st.session_state:
-    st.session_state.messages_by_module = {}
+if "chats_by_module" not in st.session_state:
+    st.session_state.chats_by_module = {}
+if "current_chat_by_module" not in st.session_state:
+    st.session_state.current_chat_by_module = {}
 if "last_answer" not in st.session_state:
     st.session_state.last_answer = ""
 if "response_style" not in st.session_state:
@@ -325,11 +334,30 @@ if "theme_choice" not in st.session_state:
     st.session_state.theme_choice = "Gece moru"
 if "video_pack" not in st.session_state:
     st.session_state.video_pack = ""
+if "last_voice_hash" not in st.session_state:
+    st.session_state.last_voice_hash = ""
+
+def ensure_chat(module):
+    """Keep multiple named conversations per workspace during the current Streamlit session."""
+    chats = st.session_state.chats_by_module.setdefault(module, [])
+    current_id = st.session_state.current_chat_by_module.get(module)
+    current = next((chat for chat in chats if chat["id"] == current_id), None)
+    if current is None:
+        current = {"id": uuid.uuid4().hex[:10], "name": "Yeni sohbet", "messages": []}
+        chats.append(current)
+        st.session_state.current_chat_by_module[module] = current["id"]
+    return current
 
 def get_messages(module):
-    if module not in st.session_state.messages_by_module:
-        st.session_state.messages_by_module[module] = []
-    return st.session_state.messages_by_module[module]
+    return ensure_chat(module)["messages"]
+
+def new_chat(module):
+    chat = {"id": uuid.uuid4().hex[:10], "name": "Yeni sohbet", "messages": []}
+    st.session_state.chats_by_module.setdefault(module, []).append(chat)
+    st.session_state.current_chat_by_module[module] = chat["id"]
+
+def current_chat(module):
+    return ensure_chat(module)
 
 def extract_file(uploaded_file):
     name = uploaded_file.name.lower()
@@ -348,6 +376,19 @@ def extract_file(uploaded_file):
     if name.endswith((".png", ".jpg", ".jpeg", ".webp")):
         return f"[Görsel eklendi: {uploaded_file.name}. Bu model bağlantısı görsel içeriğini otomatik analiz etmiyor; lütfen görseli tarif et.]"
     return f"[Desteklenmeyen dosya türü: {uploaded_file.name}]"
+
+def transcribe_audio(audio_file):
+    """Transcribe a short user-recorded voice message through Groq Whisper."""
+    if client is None:
+        raise RuntimeError("GROQ_API_KEY bulunamadı.")
+    audio_bytes = audio_file.getvalue()
+    filename = getattr(audio_file, "name", "hey_lidya_audio.wav") or "hey_lidya_audio.wav"
+    return client.audio.transcriptions.create(
+        file=(filename, audio_bytes),
+        model="whisper-large-v3-turbo",
+        response_format="text",
+    )
+
 
 def turkish_time():
     return datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%d.%m.%Y %H:%M")
@@ -434,17 +475,42 @@ with st.sidebar:
     )
     selected_module = module_keys[module_labels.index(selected_label)]
 
-    st.caption("🌐 " + ui["search_off"])
+    web_search_enabled = st.checkbox("🌐 Canlı web araması", value=False, key="web_search_enabled")
     voice_output = st.checkbox(ui["voice"], value=False, key="voice_output")
 
-    if st.button(ui["clear"], use_container_width=True):
-        if selected_module in MODULES:
-            st.session_state.messages_by_module[selected_module] = []
-        st.session_state.last_answer = ""
-        st.rerun()
+    if selected_module in MODULES:
+        active = ensure_chat(selected_module)
+        st.markdown("### 💬 Sohbetler")
+        if st.button("➕ Yeni sohbet", use_container_width=True, key="create_new_chat"):
+            new_chat(selected_module)
+            st.rerun()
+        chats = st.session_state.chats_by_module.get(selected_module, [])
+        chat_ids = [chat["id"] for chat in chats]
+        current_id = st.session_state.current_chat_by_module[selected_module]
+        selected_id = st.radio(
+            "Kayıtlı sohbetler", chat_ids,
+            index=chat_ids.index(current_id) if current_id in chat_ids else 0,
+            format_func=lambda cid: next((c["name"] for c in chats if c["id"] == cid), "Sohbet"),
+            key=f"chat_picker_{selected_module}_{len(chats)}",
+            label_visibility="collapsed",
+        )
+        if selected_id != current_id:
+            st.session_state.current_chat_by_module[selected_module] = selected_id
+            st.rerun()
+        active = current_chat(selected_module)
+        rename_value = st.text_input("Sohbet adı", value=active["name"], key=f"rename_input_{selected_module}_{active['id']}")
+        if st.button("✏️ Sohbeti yeniden adlandır", use_container_width=True, key=f"rename_btn_{selected_module}_{active['id']}"):
+            clean_name = rename_value.strip()[:60]
+            if clean_name:
+                active["name"] = clean_name
+                st.rerun()
+        if st.button("🧹 Bu sohbetin mesajlarını temizle", use_container_width=True, key=f"clear_chat_{selected_module}_{active['id']}"):
+            active["messages"] = []
+            st.session_state.last_answer = ""
+            st.rerun()
 
     st.divider()
-    st.caption("💜 Lidya AI")
+    st.caption("💜 Lidya AI · Hey Lidya sesli giriş aşağıda")
 
 # ======================================================
 # 8. HEADER + SETTINGS
@@ -461,7 +527,8 @@ if selected_module == "⚙️ Ayarlar":
     st.selectbox("Yanıt uzunluğu", ["Kısa", "Orta", "Uzun"], key="response_length")
     st.info("API anahtarları yalnızca Streamlit Cloud → Settings → Secrets bölümünde tutulmalı; kod içine yazılmamalı.")
     if st.button("Tüm çalışma alanlarının sohbetlerini temizle"):
-        st.session_state.messages_by_module = {}
+        st.session_state.chats_by_module = {}
+        st.session_state.current_chat_by_module = {}
         st.session_state.last_answer = ""
         st.rerun()
     st.caption("Bu ayarlar oturum boyunca geçerlidir. Kalıcı kullanıcı profili bu sürümde bulunmaz.")
@@ -585,12 +652,16 @@ else:
     st.caption(MODULES[selected_module][1])
     if selected_module == "📁 File Laboratory": st.info(ui["file_note"])
     if selected_module == "🩺 Medical & Anatomy": st.info("Eğitim amaçlıdır; tanı veya tedavi kararlarının yerini tutmaz.")
-    if selected_module == "🔬 Science & Research": st.caption("Canlı web araması bağlı değil; güncel kaynakları doğruladığını iddia etmez.")
+    if selected_module == "🔬 Science & Research": st.caption("Canlı arama açıksa kaynak sonuçları yanıtla birlikte kullanılabilir.")
+    if selected_module == "🎓 University & Admissions":
+        st.info("Üniversite araştırması, kabul koşulları, burs ve maddi yardım, başvuru takvimi, essay düzenleme ve profesörlere ulaşma için kullan. Güncel bilgi için sol menüden canlı web aramasını aç; mümkün olduğunda üniversitelerin resmî sitelerini esas al.")
 
 # ======================================================
 # 9. CHAT HISTORY (separate per workspace)
 # ======================================================
 if selected_module in MODULES and selected_module not in ("🎬 Video Studio",):
+    active_chat = current_chat(selected_module)
+    st.markdown(f"#### 💬 {active_chat['name']}")
     messages = get_messages(selected_module)
     if not messages:
         with st.chat_message("assistant", avatar="💜"):
@@ -600,7 +671,7 @@ if selected_module in MODULES and selected_module not in ("🎬 Video Studio",):
             st.markdown(message["content"])
             if message.get("time"):
                 st.caption(message["time"])
-    if st.session_state.get("last_web_sources") and web_search_enabled:
+    if st.session_state.get("last_web_sources") and st.session_state.get("web_search_enabled", False):
         with st.expander("🌐 Kullanılan web sonuçları"):
             for source in st.session_state.last_web_sources:
                 st.markdown(f"**[{source['title']}]({source['url']})**  \n{source['body']}")
@@ -608,6 +679,42 @@ if selected_module in MODULES and selected_module not in ("🎬 Video Studio",):
 # ======================================================
 # 10. CHAT WITH FILE ATTACHMENTS
 # ======================================================
+if selected_module in MODULES and selected_module not in ("🎬 Video Studio", "🎨 Image Studio"):
+    with st.expander("🎙️ Hey Lidya — sesle konuş", expanded=False):
+        st.caption("Mikrofon düğmesine dokunup konuşmanı kaydet. Bu, sürekli arka planda dinleme yapmaz; mikrofon yalnızca sen kaydı başlattığında kullanılır.")
+        audio_message = st.audio_input("Hey Lidya, konuşmak için kaydet")
+        if audio_message is not None:
+            audio_hash = hashlib.sha256(audio_message.getvalue()).hexdigest()
+            if audio_hash != st.session_state.last_voice_hash:
+                if client is None:
+                    st.error(ui["no_key"])
+                else:
+                    try:
+                        with st.spinner("Lidya sesini yazıya dönüştürüyor…"):
+                            spoken_text = transcribe_audio(audio_message)
+                        st.session_state.last_voice_hash = audio_hash
+                        spoken_text = str(spoken_text).strip()
+                        if spoken_text:
+                            active_messages = get_messages(selected_module)
+                            history = list(active_messages)
+                            active_messages.append({"role":"user","content":spoken_text,"time":turkish_time()})
+                            api_messages = [{"role":"system","content":build_system_instruction(selected_module,language)}]
+                            for item in history[-8:]:
+                                if item.get("role") in ("user","assistant"):
+                                    api_messages.append({"role":item["role"],"content":item["content"][:9000]})
+                            api_messages.append({"role":"user","content":spoken_text})
+                            with st.spinner(ui["thinking"]):
+                                result = client.chat.completions.create(model=MODEL_NAME,messages=api_messages,temperature=.4,max_completion_tokens=2200)
+                            voice_answer = result.choices[0].message.content or ""
+                            if voice_answer:
+                                active_messages.append({"role":"assistant","content":voice_answer,"time":turkish_time()})
+                                st.session_state.last_answer = voice_answer
+                                st.rerun()
+                        else:
+                            st.warning("Konuşma algılanamadı; tekrar kaydetmeyi dene.")
+                    except Exception as exc:
+                        st.error(f"Sesli giriş başarısız: {type(exc).__name__}: {exc}")
+
 if selected_module in MODULES and selected_module not in ("🎬 Video Studio",):
     uploaded_chat = st.chat_input(
         ui["chat"],
