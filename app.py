@@ -513,11 +513,221 @@ with st.sidebar:
     st.caption("💜 Lidya AI · Hey Lidya sesli giriş aşağıda")
 
 # ======================================================
-# 8. HEADER + SETTINGS
+# 8. HEADER + INTERACTIVE SIMULATION LABS
 # ======================================================
 st.markdown('<div class="lidya-title">LIDYA AI</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="lidya-subtitle">{ui["subtitle"]}</div>', unsafe_allow_html=True)
 st.markdown('<div class="orb"></div>', unsafe_allow_html=True)
+
+def render_module_simulation(module):
+    """Small, interactive educational lab tailored to the active workspace."""
+    if module in ("🎓 University & Admissions",):
+        st.markdown("### 🎓 Üniversite keşif laboratuvarı")
+        st.caption("Logoları, resmî üniversite sayfalarını ve başvuru hedeflerini aynı yerde keşfet.")
+        universities = {
+            "Harvard University": ("harvard.edu", "https://www.harvard.edu/", "Lisans eğitimi, araştırma ve need-based financial aid"),
+            "University of Oxford": ("ox.ac.uk", "https://www.ox.ac.uk/", "Bölüm bazlı kabul koşulları ve tutorial sistemi"),
+            "Stanford University": ("stanford.edu", "https://www.stanford.edu/", "Araştırma, girişimcilik ve disiplinler arası çalışma"),
+            "Columbia University": ("columbia.edu", "https://www.columbia.edu/", "Core Curriculum ve New York'ta kampüs yaşamı"),
+            "MIT": ("mit.edu", "https://www.mit.edu/", "STEM, tasarım ve uygulamalı araştırma"),
+            "Yale University": ("yale.edu", "https://www.yale.edu/", "Liberal arts, kolej sistemi ve araştırma"),
+            "Princeton University": ("princeton.edu", "https://www.princeton.edu/", "Lisans araştırmaları ve tez odaklı eğitim"),
+            "University of Cambridge": ("cam.ac.uk", "https://www.cam.ac.uk/", "Kolej sistemi ve bölüm bazlı akademik eğitim"),
+        }
+        chosen = st.selectbox("Bir üniversite seç", list(universities.keys()), key="uni_lab_choice")
+        domain, official_url, description = universities[chosen]
+        col_logo, col_info = st.columns([1, 2])
+        with col_logo:
+            try:
+                st.image(f"https://logo.clearbit.com/{domain}?size=256", caption=f"{chosen} logosu", use_container_width=True)
+            except Exception:
+                st.markdown(f"<div style='font-size:64px;text-align:center'>🎓</div><p style='text-align:center'>{chosen}</p>", unsafe_allow_html=True)
+        with col_info:
+            st.markdown(f"#### {chosen}")
+            st.write(description)
+            st.link_button("🌐 Resmî üniversite sitesi", official_url, use_container_width=True)
+            st.caption("Logo harici bir logo servisi üzerinden yüklenir; görüntülenmezse üniversitenin resmî sitesini aç.")
+        st.markdown("#### 🧭 Başvuru hedefi simülatörü")
+        c1, c2 = st.columns(2)
+        target_year = c1.selectbox("Hedef başlangıç yılı", ["2027", "2028", "2029", "2030"], index=1, key="uni_target_year")
+        stage = c2.selectbox("Şu anki aşaman", ["Keşif", "Akademik hazırlık", "Sınav ve dil planı", "Essay ve etkinlikler", "Başvuru gönderimi"], key="uni_stage")
+        if st.button("🗺️ Kişisel yol haritamı göster", key="uni_roadmap"):
+            plans = {
+                "Keşif": "3–5 üniversite seç; her biri için resmî bölüm ve kabul sayfalarını kaydet.",
+                "Akademik hazırlık": "Transkriptini, derslerini ve varsa beklenen mezuniyet belgelerini düzenle.",
+                "Sınav ve dil planı": "Her üniversitenin güncel test politikasını resmî kaynaktan kontrol et; sınav muafiyetlerini varsayma.",
+                "Essay ve etkinlikler": "Projelerini, öğrenme sürecini ve etkisini somut örneklerle belgele.",
+                "Başvuru gönderimi": "Her başvurunun belge listesi, son tarihi ve gönderim onayını ayrı ayrı kontrol et.",
+            }
+            st.success(f"{target_year} başlangıcı için ilk adım: {plans[stage]}")
+        st.info("Bu keşif paneli bilgilendirme amaçlıdır. Kabul koşulları, son tarihler ve burslar değişebilir; başvurmadan önce resmî sayfaları doğrula.")
+
+    elif module == "🩺 Medical & Anatomy":
+        st.markdown("### 🩺 Anatomi etkileşim laboratuvarı")
+        organ = st.selectbox("İncelenecek sistem", ["Kalp ve dolaşım", "Akciğerler ve solunum", "Beyin ve sinir sistemi", "Böbrekler ve boşaltım", "Hücre zarı"], key="med_sim_organ")
+        if organ == "Kalp ve dolaşım":
+            hr = st.slider("Örnek kalp hızı (atım/dk)", 45, 150, 72, key="med_hr")
+            systolic = st.slider("Örnek sistolik basınç (mmHg)", 80, 180, 120, key="med_bp")
+            st.metric("Dakikadaki atım", f"{hr} bpm")
+            st.progress(min(hr / 150, 1.0), text="Kalp hızı göstergesi — eğitim amaçlı")
+            st.write(f"Basitleştirilmiş örnek: kalp hızı {hr} bpm, sistolik değer {systolic} mmHg. Bu panel tanı koymaz ve kişisel ölçüm yerine geçmez.")
+        else:
+            anatomy = {"Akciğerler ve solunum":"Hava yolu → bronşlar → alveoller; gaz alışverişi alveol-kılcal damar yüzeyinde gerçekleşir.", "Beyin ve sinir sistemi":"Nöronlar elektriksel sinyaller ve sinapslardaki kimyasal iletimle bilgi aktarır.", "Böbrekler ve boşaltım":"Nefronlar kanı süzer; geri emilim ve salgılama idrarın bileşimini düzenler.", "Hücre zarı":"Fosfolipit çift tabaka, zar proteinleri ve seçici geçirgenlik hücre içi-dışı madde alışverişini düzenler."}
+            st.info(anatomy[organ])
+        st.caption("Eğitim amaçlı simülasyondur; gerçek klinik kararlar için kullanılmamalıdır.")
+
+    elif module == "🔬 Science & Research":
+        st.markdown("### 🔬 Deney simülatörü")
+        experiment = st.selectbox("Deney", ["Sarkaç", "Soğuma", "Fotosentezde ışık", "pH ve asitlik"], key="science_sim")
+        if experiment == "Sarkaç":
+            length = st.slider("Sarkaç uzunluğu (m)", 0.2, 3.0, 1.0, 0.1, key="pendulum_length")
+            st.metric("Yaklaşık periyot", f"{2*math.pi*math.sqrt(length/9.81):.2f} s")
+            st.caption("Küçük salınım açısı varsayımıyla ideal model.")
+        elif experiment == "Soğuma":
+            initial = st.slider("Başlangıç sıcaklığı (°C)", 30, 100, 90, key="cool_init")
+            ambient = st.slider("Ortam sıcaklığı (°C)", 0, 35, 22, key="cool_ambient")
+            k = st.slider("Soğuma katsayısı", 0.01, 0.2, 0.05, 0.01, key="cool_k")
+            t = np.linspace(0, 60, 200); temp = ambient + (initial-ambient)*np.exp(-k*t)
+            fig, ax = plt.subplots(); ax.plot(t, temp); ax.set_xlabel("Dakika"); ax.set_ylabel("Sıcaklık (°C)"); ax.grid(True, alpha=.25); st.pyplot(fig, use_container_width=True)
+        elif experiment == "Fotosentezde ışık":
+            light = st.slider("Göreli ışık şiddeti", 0, 100, 50, key="photo_light")
+            st.progress(light/100, text="Göreli ışık şiddeti")
+            st.write(f"Basit öğretici modelde göreli hız: {100*light/(light+25):.1f}% (gerçek bitkilerde sonuç başka etkenlere de bağlıdır).")
+        else:
+            ph = st.slider("pH", 0.0, 14.0, 7.0, 0.5, key="ph_sim")
+            st.metric("Çözelti", "Asidik" if ph < 7 else "Bazik" if ph > 7 else "Nötr")
+
+    elif module == "⚙️ Engineering":
+        st.markdown("### ⚙️ Mühendislik tasarım masası")
+        tab1, tab2 = st.tabs(["Köprü", "Elektrik devresi"])
+        with tab1:
+            span = st.slider("Köprü açıklığı (m)", 5, 50, 20, key="bridge_span")
+            load = st.slider("Ortadaki yük (kN)", 1, 100, 20, key="bridge_load")
+            st.metric("Basit simetrik modelde her mesnette tepki", f"{load/2:.1f} kN")
+            st.caption(f"Açıklık: {span} m. Bu yalnızca basitleştirilmiş statik örnektir; gerçek tasarım hesabı değildir.")
+        with tab2:
+            voltage = st.slider("Gerilim (V)", 1, 24, 12, key="circuit_v")
+            resistance = st.slider("Direnç (Ω)", 1, 100, 12, key="circuit_r")
+            st.metric("Akım (Ohm yasası)", f"{voltage/resistance:.3f} A")
+            st.metric("Güç", f"{voltage**2/resistance:.2f} W")
+
+    elif module == "💻 Software Engineering":
+        st.markdown("### 💻 Algoritma laboratuvarı")
+        algorithm = st.selectbox("Algoritma", ["Doğrusal arama", "İkili arama", "Kabarcık sıralama"], key="algo_sim")
+        raw = st.text_input("Sayıları virgülle yaz", "8, 3, 11, 2, 7", key="algo_values")
+        try:
+            values = [int(v.strip()) for v in raw.split(",") if v.strip()]
+            if algorithm == "Doğrusal arama":
+                target = st.number_input("Aranan sayı", value=7, step=1, key="linear_target")
+                steps = []
+                for idx, val in enumerate(values):
+                    steps.append(f"{idx}: {val}" + (" ← bulundu" if val == target else ""))
+                    if val == target: break
+                st.code("\n".join(steps) if steps else "Liste boş")
+            elif algorithm == "İkili arama":
+                target = st.number_input("Aranan sayı", value=7, step=1, key="binary_target")
+                ordered = sorted(values); lo, hi = 0, len(ordered)-1; trace=[]
+                while lo <= hi:
+                    mid=(lo+hi)//2; trace.append(f"Aralık [{lo}, {hi}] → orta indeks {mid}: {ordered[mid]}")
+                    if ordered[mid] == target: trace.append("Bulundu!"); break
+                    if ordered[mid] < target: lo=mid+1
+                    else: hi=mid-1
+                st.write("Sıralanmış liste:", ordered); st.code("\n".join(trace) if trace else "Liste boş")
+            else:
+                arr = values[:]; passes=[]
+                for i in range(len(arr)):
+                    changed=False
+                    for j in range(0, len(arr)-i-1):
+                        if arr[j] > arr[j+1]: arr[j],arr[j+1]=arr[j+1],arr[j]; changed=True
+                    passes.append(f"Tur {i+1}: {arr}")
+                    if not changed: break
+                st.code("\n".join(passes) if passes else "Liste boş")
+                st.success(f"Sonuç: {arr}")
+        except ValueError:
+            st.warning("Yalnızca virgülle ayrılmış tam sayılar gir.")
+
+    elif module == "🌍 Language Teacher":
+        st.markdown("### 🌍 Dil pratiği simülatörü")
+        scenario = st.selectbox("Durum", ["Üniversite mülakatı", "Kafede sipariş", "Yeni biriyle tanışma", "Profesörden bilgi isteme"], key="lang_scenario")
+        level = st.select_slider("Pratik seviyesi", options=["A1", "A2", "B1", "B2", "C1"], value="A2", key="lang_level")
+        prompts = {"Üniversite mülakatı":"Tell me about yourself and one project you are proud of.", "Kafede sipariş":"Hello! What would you like to order?", "Yeni biriyle tanışma":"Hi! What do you enjoy learning about?", "Profesörden bilgi isteme":"What research topic are you interested in, and why?"}
+        st.info(f"**{scenario} · {level}**\n\n{prompts[scenario]}")
+        st.caption("Yanıtını hedef dilde yazıp aşağıdaki sohbette Lidya'dan düzeltme ve açıklama isteyebilirsin.")
+
+    elif module == "📊 Data Analysis":
+        st.markdown("### 📊 Veri keşif masası")
+        raw = st.text_input("Örnek değerler (virgülle)", "12, 15, 18, 21, 24, 30", key="data_sim_values")
+        try:
+            vals = np.array([float(x.strip()) for x in raw.split(",") if x.strip()])
+            if len(vals):
+                c1,c2,c3 = st.columns(3); c1.metric("Ortalama", f"{np.mean(vals):.2f}"); c2.metric("Medyan", f"{np.median(vals):.2f}"); c3.metric("Standart sapma", f"{np.std(vals):.2f}")
+                fig, ax = plt.subplots(); ax.plot(range(1,len(vals)+1), vals, marker="o"); ax.set_xlabel("Gözlem"); ax.set_ylabel("Değer"); ax.grid(True, alpha=.25); st.pyplot(fig, use_container_width=True)
+        except ValueError: st.warning("Sayıları virgülle ayırarak gir.")
+
+    elif module == "📊 Business & Economics":
+        st.markdown("### 💼 Sanal işletme simülatörü")
+        revenue = st.slider("Aylık gelir (₺)", 0, 200000, 50000, 1000, key="biz_rev")
+        costs = st.slider("Aylık gider (₺)", 0, 200000, 30000, 1000, key="biz_cost")
+        marketing = st.slider("Pazarlama bütçesi (₺)", 0, 50000, 5000, 500, key="biz_marketing")
+        profit = revenue-costs-marketing
+        c1,c2=st.columns(2); c1.metric("Tahmini net sonuç", f"₺{profit:,.0f}"); c2.metric("Kâr marjı", f"{(profit/revenue*100):.1f}%" if revenue else "Gelir yok")
+        st.caption("Öğrenme amaçlı varsayımsal model; gerçek finansal tavsiye değildir.")
+
+    elif module == "🔐 Cybersecurity":
+        st.markdown("### 🔐 Savunma odaklı güvenlik laboratuvarı")
+        password = st.text_input("Örnek parola gücü denetimi (gerçek parolanı girme)", type="password", key="cyber_demo_password")
+        score = sum([len(password)>=12, bool(re.search(r"[a-z]",password) and re.search(r"[A-Z]",password)), bool(re.search(r"\d",password)), bool(re.search(r"[^A-Za-z0-9]",password))])
+        st.progress(score/4, text=f"Örnek güç göstergesi: {score}/4")
+        st.caption("Gerçek parolanı yazma. Bu yalnızca yerel, basitleştirilmiş bir gösterge; parolayı hiçbir yere göndermemelidir.")
+
+    elif module == "🏠 Smart Devices":
+        st.markdown("### 🏠 Sanal akıllı ev paneli")
+        temp = st.slider("Oda sıcaklığı (°C)", 10, 35, 22, key="smart_temp")
+        light = st.toggle("Sanal ışık", key="smart_light")
+        heater = st.toggle("Sanal ısıtıcı", key="smart_heater")
+        c1,c2=st.columns(2); c1.metric("Sıcaklık", f"{temp} °C"); c2.metric("Işık", "Açık" if light else "Kapalı")
+        st.info("Bu sanal panel yalnızca arayüz demosudur; gerçek cihazlara bağlanmaz.")
+
+    elif module == "📚 Education":
+        st.markdown("### 📚 Öğrenme kontrol noktası")
+        subject = st.selectbox("Konu", ["Biyoloji", "Tarih", "İngilizce", "Matematik", "Coğrafya"], key="edu_subject")
+        if subject == "Biyoloji": q, opts, correct = "Hücre zarının temel yapısı hangisidir?", ["Fosfolipit çift tabaka", "Selüloz duvar", "Saf DNA"], 0
+        elif subject == "Tarih": q, opts, correct = "Tarihî bir iddiayı değerlendirirken en güçlü yaklaşım hangisidir?", ["Tek bir söylenti", "Birden fazla güvenilir kaynak", "Kaynağı kontrol etmemek"], 1
+        elif subject == "İngilizce": q, opts, correct = "‘I ___ a student.’ boşluğuna hangisi gelir?", ["am", "are", "be"], 0
+        elif subject == "Matematik": q, opts, correct = "3x = 18 ise x kaçtır?", ["3", "6", "9"], 1
+        else: q, opts, correct = "Ekvator Dünya'yı hangi iki yarımküreye ayırır?", ["Doğu-Batı", "Kuzey-Güney", "Kara-Deniz"], 1
+        st.write(q); answer = st.radio("Yanıtın", opts, key="edu_answer")
+        if st.button("Yanıtı kontrol et", key="edu_check"):
+            if opts.index(answer) == correct: st.success("Doğru! Güzel ilerliyorsun.")
+            else: st.warning(f"Tekrar dene. Doğru yanıt: {opts[correct]}")
+
+    elif module == "⚖️ Legal Research":
+        st.markdown("### ⚖️ Hukuki argüman inceleme")
+        scenario = st.selectbox("Kurgusal durum", ["İade talebi", "Kira anlaşmazlığı", "Dijital gizlilik"], key="legal_scenario")
+        st.info({"İade talebi":"Alıcı, ürünü teslim aldıktan sonra iade etmek istiyor. Önce ülke, satın alma kanalı ve süre koşullarını belirle.", "Kira anlaşmazlığı":"Kiracı ve ev sahibi arasında depozito uyuşmazlığı var. Sözleşme ve yerel mevzuat önemlidir.", "Dijital gizlilik":"Bir uygulama kullanıcı verisi topluyor. Hangi verinin, hangi amaçla ve hangi hukuki dayanakla işlendiğini sor."}[scenario])
+        st.caption("Genel eğitim amaçlıdır; gerçek hukuki danışmanlık değildir.")
+
+    elif module == "✍️ Writing & Creativity":
+        st.markdown("### ✍️ Yaratıcı yazı laboratuvarı")
+        genre = st.selectbox("Tür", ["Bilim kurgu", "Gizem", "Deneme", "Kısa öykü", "Şiir fikri"], key="writing_genre")
+        mood = st.select_slider("Atmosfer", options=["Sakin", "Merak uyandıran", "Gerilimli", "Umutlu"], value="Merak uyandıran", key="writing_mood")
+        seed = st.text_input("Hikâye tohumu", "Bir gün okul laboratuvarında bilinmeyen bir sinyal bulundu…", key="writing_seed")
+        st.write(f"**Yazı kıvılcımı:** {genre} · {mood}: {seed}")
+
+    elif module == "📁 File Laboratory":
+        st.markdown("### 📁 Dosya laboratuvarı")
+        st.caption("Sohbet kutusuna PDF, DOCX, TXT, MD, CSV, JSON veya PY dosyası ekleyip özetleme, karşılaştırma ya da soru-cevap iste.")
+        task = st.selectbox("Dosya inceleme görevi", ["Özetle", "Anahtar kavramları çıkar", "İki dosyayı karşılaştır", "Sorular hazırla"], key="file_sim_task")
+        st.write(f"Seçilen iş akışı: **{task}**. Dosyayı aşağıdaki sohbet alanından ekleyebilirsin.")
+
+    elif module == "💜 Lidya":
+        st.markdown("### 💜 Lidya keşif masası")
+        goal = st.selectbox("Bugün ne üretelim?", ["Bir fikri projeye dönüştür", "Bir konuyu öğren", "Bir metin geliştir", "Bir kod hatasını çöz", "Bir araştırma planla"], key="lidya_goal")
+        st.write("Seçimin:", goal, "— aşağıdaki sohbette bu hedefle başlayabilirsin.")
+
+# Show the matching simulation before the workspace chat.
+if selected_module in MODULES and selected_module not in ("📐 Mathematics", "🎬 Video Studio", "🎨 Image Studio"):
+    render_module_simulation(selected_module)
 
 if selected_module == "⚙️ Ayarlar":
     st.title("⚙️ Ayarlar")
