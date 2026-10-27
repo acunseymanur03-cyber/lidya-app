@@ -14,6 +14,7 @@ MODEL_NAME = "openai/gpt-oss-20b"
 LANGUAGES = {"Türkçe":"Turkish", "English":"English", "Français":"French", "Deutsch":"German", "Español":"Spanish", "Italiano":"Italian", "日本語":"Japanese"}
 WORKSPACES = {
     "💜 Lidya": ("Genel Asistan", "Sohbet, fikir geliştirme ve günlük üretkenlik."),
+    "📁 Dosya Laboratuvarı": ("Dosya Laboratuvarı", "Desteklenen belgeleri sohbet kutusuna ekle; metinlerini özetle, açıkla ve analiz et."),
     "🔎 Araştırma": ("Araştırma Laboratuvarı", "Araştırma soruları, kanıt analizi ve rapor planları."),
     "📚 Eğitim": ("Öğrenme Tasarımı", "Konu anlatımı, çalışma planları ve quizler."),
     "✍️ Yazma": ("Yazı ve Yaratıcılık", "Özgün yazılar, düzenleme, hikâye ve sunumlar."),
@@ -25,12 +26,34 @@ WORKSPACES = {
     "⚖️ Hukuk": ("Hukuk Araştırmaları", "Genel hukuki kavramlar ve araştırma desteği."),
     "⚙️ Mühendislik": ("Mühendislik", "Mühendislik prensipleri, modeller ve hesaplamalar."),
     "📊 Veri Analizi": ("Veri Analizi", "Veri yorumlama ve grafikler."),
+    "💼 İşletme ve Ekonomi": ("İşletme ve Ekonomi", "İşletme, girişimcilik, ekonomi ve finansal kavramlar."),
     "🔐 Siber Güvenlik": ("Siber Güvenlik", "Güvenli yazılım, gizlilik ve savunma odaklı çalışmalar."),
     "🏠 Akıllı Cihazlar": ("Akıllı Cihazlar", "IoT tasarımı ve güvenli cihaz entegrasyonu planlama."),
     "🎨 Görsel Atölyesi": ("Görsel Atölyesi", "Görsel konsept ve üretim araçları için ayrıntılı istemler."),
     "🎬 Video Atölyesi": ("Lidya Motion Studio", "Konsept, senaryo, storyboard ve video üretim planı."),
 }
+MODULE_LABELS = {
+    "Türkçe": {},
+    "English": {
+        "📁 Dosya Laboratuvarı":"📁 File Laboratory", "🔎 Araştırma":"🔎 Research",
+        "📚 Eğitim":"📚 Education", "✍️ Yazma":"✍️ Writing & Creativity",
+        "💻 Yazılım":"💻 Software Engineering", "📐 Matematik":"📐 Mathematics",
+        "🔬 Bilim":"🔬 Science & Research", "🩺 Tıp ve Anatomi":"🩺 Medical & Anatomy",
+        "🌍 Dil Öğretmeni":"🌍 Language Teacher", "⚖️ Hukuk":"⚖️ Legal Research",
+        "⚙️ Mühendislik":"⚙️ Engineering", "📊 Veri Analizi":"📊 Data Analysis",
+        "💼 İşletme ve Ekonomi":"💼 Business & Economics", "🔐 Siber Güvenlik":"🔐 Cybersecurity",
+        "🏠 Akıllı Cihazlar":"🏠 Smart Devices", "🎨 Görsel Atölyesi":"🎨 Image Studio",
+        "🎬 Video Atölyesi":"🎬 Video Studio", "💜 Lidya":"💜 Lidya AI", "⚙️ Ayarlar":"⚙️ Settings"
+    },
+    "Français": {"📁 Dosya Laboratuvarı":"📁 Laboratoire de fichiers", "🔎 Araştırma":"🔎 Recherche", "📚 Eğitim":"📚 Éducation", "✍️ Yazma":"✍️ Écriture", "💻 Yazılım":"💻 Développement logiciel", "📐 Matematik":"📐 Mathématiques", "🔬 Bilim":"🔬 Sciences", "🩺 Tıp ve Anatomi":"🩺 Médecine et anatomie", "🌍 Dil Öğretmeni":"🌍 Professeur de langues", "⚖️ Hukuk":"⚖️ Droit", "⚙️ Mühendislik":"⚙️ Ingénierie", "📊 Veri Analizi":"📊 Analyse de données", "💼 İşletme ve Ekonomi":"💼 Économie et gestion", "🔐 Siber Güvenlik":"🔐 Cybersécurité", "🏠 Akıllı Cihazlar":"🏠 Appareils connectés", "🎨 Görsel Atölyesi":"🎨 Studio d’images", "🎬 Video Atölyesi":"🎬 Studio vidéo", "💜 Lidya":"💜 Lidya", "⚙️ Ayarlar":"⚙️ Paramètres"},
+    "Deutsch": {"📁 Dosya Laboratuvarı":"📁 Dateilabor", "🔎 Araştırma":"🔎 Recherche", "📚 Eğitim":"📚 Bildung", "✍️ Yazma":"✍️ Schreiben", "💻 Yazılım":"💻 Softwareentwicklung", "📐 Matematik":"📐 Mathematik", "🔬 Bilim":"🔬 Wissenschaft", "🩺 Tıp ve Anatomi":"🩺 Medizin und Anatomie", "🌍 Dil Öğretmeni":"🌍 Sprachlehrer", "⚖️ Hukuk":"⚖️ Recht", "⚙️ Mühendislik":"⚙️ Ingenieurwesen", "📊 Veri Analizi":"📊 Datenanalyse", "💼 İşletme ve Ekonomi":"💼 Wirtschaft", "🔐 Siber Güvenlik":"🔐 Cybersicherheit", "🏠 Akıllı Cihazlar":"🏠 Smartgeräte", "🎨 Görsel Atölyesi":"🎨 Bildstudio", "🎬 Video Atölyesi":"🎬 Videostudio", "💜 Lidya":"💜 Lidya", "⚙️ Ayarlar":"⚙️ Einstellungen"},
+    "Español": {"📁 Dosya Laboratuvarı":"📁 Laboratorio de archivos", "🔎 Araştırma":"🔎 Investigación", "📚 Eğitim":"📚 Educación", "✍️ Yazma":"✍️ Escritura", "💻 Yazılım":"💻 Ingeniería de software", "📐 Matematik":"📐 Matemáticas", "🔬 Bilim":"🔬 Ciencia", "🩺 Tıp ve Anatomi":"🩺 Medicina y anatomía", "🌍 Dil Öğretmeni":"🌍 Profesor de idiomas", "⚖️ Hukuk":"⚖️ Derecho", "⚙️ Mühendislik":"⚙️ Ingeniería", "📊 Veri Analizi":"📊 Análisis de datos", "💼 İşletme ve Ekonomi":"💼 Economía y negocios", "🔐 Siber Güvenlik":"🔐 Ciberseguridad", "🏠 Akıllı Cihazlar":"🏠 Dispositivos inteligentes", "🎨 Görsel Atölyesi":"🎨 Estudio de imagen", "🎬 Video Atölyesi":"🎬 Estudio de vídeo", "💜 Lidya":"💜 Lidya", "⚙️ Ayarlar":"⚙️ Ajustes"},
+    "Italiano": {"📁 Dosya Laboratuvarı":"📁 Laboratorio file", "🔎 Araştırma":"🔎 Ricerca", "📚 Eğitim":"📚 Istruzione", "✍️ Yazma":"✍️ Scrittura", "💻 Yazılım":"💻 Ingegneria software", "📐 Matematik":"📐 Matematica", "🔬 Bilim":"🔬 Scienza", "🩺 Tıp ve Anatomi":"🩺 Medicina e anatomia", "🌍 Dil Öğretmeni":"🌍 Insegnante di lingue", "⚖️ Hukuk":"⚖️ Diritto", "⚙️ Mühendislik":"⚙️ Ingegneria", "📊 Veri Analizi":"📊 Analisi dei dati", "💼 İşletme ve Ekonomi":"💼 Economia e impresa", "🔐 Siber Güvenlik":"🔐 Sicurezza informatica", "🏠 Akıllı Cihazlar":"🏠 Dispositivi smart", "🎨 Görsel Atölyesi":"🎨 Studio immagini", "🎬 Video Atölyesi":"🎬 Studio video", "💜 Lidya":"💜 Lidya", "⚙️ Ayarlar":"⚙️ Impostazioni"},
+    "日本語": {"📁 Dosya Laboratuvarı":"📁 ファイルラボ", "🔎 Araştırma":"🔎 リサーチ", "📚 Eğitim":"📚 学習", "✍️ Yazma":"✍️ 文章と創作", "💻 Yazılım":"💻 ソフトウェア開発", "📐 Matematik":"📐 数学", "🔬 Bilim":"🔬 科学研究", "🩺 Tıp ve Anatomi":"🩺 医学と解剖学", "🌍 Dil Öğretmeni":"🌍 言語学習", "⚖️ Hukuk":"⚖️ 法律研究", "⚙️ Mühendislik":"⚙️ 工学", "📊 Veri Analizi":"📊 データ分析", "💼 İşletme ve Ekonomi":"💼 経済とビジネス", "🔐 Siber Güvenlik":"🔐 サイバーセキュリティ", "🏠 Akıllı Cihazlar":"🏠 スマートデバイス", "🎨 Görsel Atölyesi":"🎨 画像スタジオ", "🎬 Video Atölyesi":"🎬 動画スタジオ", "💜 Lidya":"💜 Lidya", "⚙️ Ayarlar":"⚙️ 設定"},
+}
 GUIDANCE = {
+    "📁 Dosya Laboratuvarı":"Ekli desteklenen dosyanın çıkarılmış metnini analiz et; dosyanın içeriği gelmediyse bunu açıkça söyle.",
+    "💼 İşletme ve Ekonomi":"İş ve ekonomi kavramlarını açıkla; finansal sonuçları garanti etme.",
     "🔎 Araştırma":"Kaynak uydurma. Bu sürümde canlı web araması bağlı değil; güncel kaynak gerekiyorsa bunu açıkça belirt ve doğrulama stratejisi öner.",
     "📐 Matematik":"İşlemleri kontrol et, sembolleri tanımla ve çözümü adım adım açıkla.",
     "🩺 Tıp ve Anatomi":"Eğitim amaçlı bilgi ver. Kişisel teşhis veya tedavi kararı verme; önemli durumlarda sağlık uzmanına yönlendir.",
@@ -134,7 +157,8 @@ st.markdown(f"""<style>
 with st.sidebar:
     st.markdown("## 💜 Lidya AI"); st.caption("Düşün. Öğren. Üret. Keşfet.")
     page_options=list(WORKSPACES.keys())+["⚙️ Ayarlar"]
-    page=st.radio("Çalışma alanları", page_options, key="selected_page")
+    labels = MODULE_LABELS.get(st.session_state.interface_language, {})
+    page=st.radio("Çalışma alanları", page_options, key="selected_page", format_func=lambda item: labels.get(item, item))
     st.divider(); st.checkbox("Yanıtları sesli oku", key="voice_output"); st.checkbox("Mesajlarda Türkiye saatini göster", key="show_timestamps")
     if st.button("🧹 Bu alanın sohbetini temizle", use_container_width=True):
         if page in WORKSPACES: clear_page(page)
@@ -207,7 +231,31 @@ else:
     title,desc=WORKSPACES[page]; st.title(title); st.write(desc)
     if page=="🩺 Tıp ve Anatomi": st.info("Eğitim amaçlıdır; tanı veya tedavi kararlarının yerini tutmaz.")
     if page=="🔎 Araştırma": st.caption("Canlı web araması bu sürümde bağlı değil. Lidya araştırma planı ve analiz hazırlayabilir; güncel kaynakları doğruladığını iddia etmez.")
-    if page=="🎨 Görsel Atölyesi": st.markdown("**İpucu:** Konu, kompozisyon, kamera, ışık, malzeme, renk paleti ve kaçınılacak öğeleri yaz.")
+    if page=="📁 Dosya Laboratuvarı":
+        st.caption("Dosyanı aşağıdaki sohbet kutusundaki ekleme simgesiyle yükleyebilirsin. PDF, DOCX, TXT, MD, CSV, JSON ve PY dosyalarından metin çıkarılır.")
+    if page=="🎨 Görsel Atölyesi":
+        st.markdown("**Görsel konsept laboratuvarı**")
+        with st.form("image_prompt_form"):
+            subject=st.text_area("Ne oluşturmak istiyorsun?", placeholder="Örn. insan kalbi anatomik illüstrasyonu; bilimsel doğruluk, net etiket alanları…", height=90)
+            col1,col2,col3=st.columns(3)
+            medium=col1.selectbox("Tür", ["Bilimsel illüstrasyon", "Dijital sanat", "Editoryal çizim", "3D render", "Poster"])
+            framing=col2.selectbox("Kompozisyon", ["Merkezî", "Yakın plan", "Kesit görünümü", "İnfografik", "Sinematik geniş plan"])
+            look=col3.selectbox("Stil", ["Temiz ve gerçekçi", "Minimal", "Sinematik", "El çizimi", "Fotogerçekçi"])
+            avoid=st.text_input("Kaçınılacaklar", value="yazım hataları, bozuk anatomi, anlamsız etiketler, watermark")
+            make_prompt=st.form_submit_button("✨ Görsel üretim istemini hazırla", use_container_width=True)
+        if make_prompt:
+            if not subject.strip(): st.warning("Önce görsel fikrini yaz.")
+            elif not client: st.error("İstem hazırlamak için GROQ_API_KEY yapılandırılmalı.")
+            else:
+                prompt=f"Görsel üretim aracı için ayrıntılı, uygulanabilir bir İNGİLİZCE prompt ve ayrı bir negative prompt hazırla. Konu: {subject}. Tür: {medium}. Kompozisyon: {framing}. Stil: {look}. Kaçınılacaklar: {avoid}. Işık, kamera/açı, malzeme, renk paleti, arka plan, detay düzeyi ve bilimsel doğruluk ölçütlerini ekle. Görseli gerçekten ürettiğini iddia etme."
+                with st.spinner("Görsel istemi hazırlanıyor…"):
+                    answer,error=ask_model(page,prompt,[])
+                if error: st.error(error)
+                else:
+                    st.session_state.image_prompt=answer
+        if st.session_state.get("image_prompt"):
+            st.markdown(st.session_state.image_prompt)
+            st.download_button("⬇️ İstemi indir", st.session_state.image_prompt, file_name="lidya_gorsel_istemi.txt", mime="text/plain")
     draw_chat(page)
     value=st.chat_input("Lidya'ya yaz veya dosya ekle…",accept_file="multiple",file_type=["pdf","docx","txt","md","csv","json","py","png","jpg","jpeg","webp"])
     if value: process_chat(page,value)
