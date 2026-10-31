@@ -45,6 +45,7 @@ LANGUAGES = {
     "Español": "Spanish",
     "Italiano": "Italian",
     "日本語": "Japanese",
+    "العربية": "Arabic",
 }
 
 MODULES = {
@@ -87,6 +88,27 @@ MODULE_LABELS = {
         "🏠 Smart Devices": "🏠 Akıllı Cihazlar",
         "🎨 Image Studio": "🎨 Görsel Atölyesi",
         "🎬 Video Studio": "🎬 Video Atölyesi",
+    },
+    "العربية": {
+        "💜 Lidya": "💜 ليديا",
+        "📁 File Laboratory": "📁 مختبر الملفات",
+        "🩺 Medical & Anatomy": "🩺 الطب والتشريح",
+        "⚖️ Legal Research": "⚖️ البحث القانوني",
+        "🌍 Language Teacher": "🌍 معلم اللغات",
+        "💻 Software Engineering": "💻 هندسة البرمجيات",
+        "🔬 Science & Research": "🔬 العلوم والبحث",
+        "📐 Mathematics": "📐 الرياضيات",
+        "⚙️ Engineering": "⚙️ الهندسة",
+        "📚 Education": "📚 التعليم",
+        "🎓 University & Admissions": "🎓 الجامعات والقبول",
+        "📊 Business & Economics": "📊 الأعمال والاقتصاد",
+        "✍️ Writing & Creativity": "✍️ الكتابة والإبداع",
+        "📈 Data Analysis": "📈 تحليل البيانات",
+        "🔐 Cybersecurity": "🔐 الأمن السيبراني",
+        "🏠 Smart Devices": "🏠 الأجهزة الذكية",
+        "🎨 Image Studio": "🎨 استوديو الصور",
+        "🎬 Video Studio": "🎬 استوديو الفيديو",
+        "⚙️ Ayarlar": "⚙️ الإعدادات",
     }
 }
 
@@ -209,6 +231,23 @@ TEXT = {
         "prepare": "プロンプトを準備",
         "file_note": "対応するPDF、DOCX、TXT、MD、CSV、JSON、PYファイルをチャットに添付できます。",
         "error": "回答を生成できませんでした。APIキー、モデル、利用制限を確認してください。",
+    },
+    "العربية": {
+        "subtitle": "فكّر. تعلّم. ابتكر. اكتشف.",
+        "language": "لغة الواجهة والإجابات",
+        "modules": "مساحات العمل",
+        "clear": "مسح المحادثة",
+        "voice": "قراءة الإجابة بصوت عالٍ",
+        "thinking": "ليديا تفكّر...",
+        "chat": "اسأل ليديا أي شيء...",
+        "welcome": "مرحبًا! أنا ليديا، مساعدتك للتعلّم والإبداع. كيف يمكنني مساعدتك؟",
+        "no_key": "لم يتم العثور على GROQ_API_KEY. تحقّق من إعدادات Streamlit Secrets.",
+        "footer": "صُنعت بفضول وباستخدام Python.",
+        "search_off": "يمكن تفعيل البحث المباشر على الويب.",
+        "creative": "ماذا تريد أن تنشئ؟",
+        "prepare": "إعداد المطالبة",
+        "file_note": "يمكنك إرفاق ملفات PDF وDOCX وTXT وMD وCSV وJSON وPY المدعومة مباشرةً في المحادثة.",
+        "error": "تعذّر إنشاء الإجابة. تحقّق من مفتاح API وإمكانية الوصول إلى النموذج والحصة المتاحة.",
     },
 }
 
@@ -1033,7 +1072,7 @@ if selected_module == "🎨 Image Studio":
 # ======================================================
 voice_output = st.session_state.get("voice_output", False)
 if voice_output and st.session_state.last_answer:
-    speech_language = {"Türkçe":"tr-TR","English":"en-US","Français":"fr-FR","Deutsch":"de-DE","Español":"es-ES","Italiano":"it-IT","日本語":"ja-JP"}[language]
+    speech_language = {"Türkçe":"tr-TR","English":"en-US","Français":"fr-FR","Deutsch":"de-DE","Español":"es-ES","Italiano":"it-IT","日本語":"ja-JP","العربية":"ar-SA"}[language]
     safe_text = json.dumps(st.session_state.last_answer, ensure_ascii=False)
     components.html(f"""<script>const text={safe_text};const utterance=new SpeechSynthesisUtterance(text);utterance.lang=\"{speech_language}\";utterance.rate=1.0;window.speechSynthesis.cancel();window.speechSynthesis.speak(utterance);</script>""",height=0)
 
