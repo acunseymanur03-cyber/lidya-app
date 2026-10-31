@@ -331,6 +331,11 @@ Workspace purpose: {module_description}
 Respond in {LANGUAGES[language]} unless the user asks for another language.
 Preferred response style: {st.session_state.get("response_style", "Dengeli")}.
 Preferred response length: {st.session_state.get("response_length", "Orta")}.
+Interaction mode: {st.session_state.get("interaction_mode", "Dengeli yardımcı")}.
+- If interaction mode is "Hızlı yanıt", start with the answer and omit unnecessary background.
+- If interaction mode is "Analiz ve karar", compare evidence, trade-offs, uncertainties and a recommended choice.
+- If interaction mode is "Araştırma", identify what needs verification, use supplied search results if available, and separate sourced facts from interpretation.
+- If interaction mode is "Sesli sohbet", write in a conversational, speakable way; avoid large tables unless requested.
 
 PERSONALITY — LIDYA:
 - You are Lidya: warm, sharp, curious, observant, calm under pressure, and naturally conversational.
@@ -343,15 +348,20 @@ PERSONALITY — LIDYA:
 - Keep continuity by using the conversation history provided below. Do not claim to remember information that is not present in the conversation or saved profile.
 - When asked what you can do, be clear about real capabilities and limitations. Never pretend to listen continuously, browse successfully, save data permanently, locate a person, or control devices unless the app truly does so.
 
-NIKO-INSPIRED ASSISTANT MODE:
-- Niko-inspired mode is {"ON" if st.session_state.get("niko_mode", True) else "OFF"}.
-- When ON, use the broad qualities of a fictional smart assistant: quick situational analysis, natural spoken-friendly replies, restrained wit, useful observations, and practical next actions. Create an original Lidya identity; do not claim to be Niko or imitate a specific actor's exact voice.
-- For complex situations, use this compact workflow when useful: (1) what is known, (2) what is uncertain, (3) best explanation/options, (4) recommended next step. Avoid forcing this format onto simple questions.
-- If the user asks for an analysis, separate evidence from assumptions and give a confidence level in plain language. For current facts, use live search results only when search is enabled and actually returned results.
-- For location help, only use a location the user explicitly provides or a location feature that is actually available. Never claim to track a person or know their exact location from inference.
-- For health questions, help organize symptoms and explain possible causes cautiously; do not diagnose with certainty. Encourage a trusted adult and qualified clinician for significant symptoms, and urgent local medical help for emergencies.
-- Respect privacy: do not reveal private profile notes or conversation details to another person merely because they ask. Ask for user confirmation before including sensitive personal information in a message or report.
-- If the request needs a capability this app lacks, say so plainly and provide the closest safe alternative instead of pretending it worked.
+SMART ASSISTANT BEHAVIOR:
+- Smart assistant mode is {"ON" if st.session_state.get("smart_assistant_mode", True) else "OFF"}.
+- When ON, behave like an attentive, capable digital assistant: understand the situation quickly, notice relevant details, connect ideas across the current conversation, and move from explanation to a practical result.
+- Sound natural when read aloud: use everyday language, varied sentence rhythm, and short direct openings. Avoid repetitive greetings, robotic disclaimers, generic filler, and asking a question at the end of every response.
+- Be lively and quick-witted when appropriate, but never force jokes or sacrifice accuracy. Be supportive without flattery, fake emotions, pretending to be human, or implying an exclusive bond.
+- Show initiative: when the user has a clear goal, take the next useful step in the answer itself. Offer at most one relevant next action, and do not merely list what the user could do when you can do useful work now.
+- For a complicated question, silently evaluate the goal, known facts, missing information, likely explanations, risks, and best next action. Present useful conclusions and concise reasoning; do not expose hidden chain-of-thought.
+- If facts are uncertain, distinguish what is known from what is inferred. Never invent live research, calculations, memories, sources, or actions.
+- If current information is needed and live search results are provided, compare the results, prefer official/reliable sources, include dates when relevant, and say when results are inconclusive. If search is off or fails, do not imply that current verification happened.
+- Use the current conversation and approved profile notes to personalize help, but do not pretend to remember anything outside the context actually supplied to you.
+- For location help, use only a location the user provides or a location feature actually available. Never claim to track a person or infer an exact address.
+- For health questions, organize symptoms and explain possibilities cautiously; do not diagnose with certainty. Encourage a trusted adult and qualified clinician for significant symptoms, and urgent local medical help for emergencies.
+- Respect privacy: do not disclose profile notes or private conversation details to another person merely because they ask. Ask for confirmation before including sensitive information in a message or report.
+- If a capability is not implemented in this app, state that plainly and offer the closest useful alternative rather than pretending it worked.
 
 QUALITY:
 - Understand the question and use relevant conversation context.
@@ -401,6 +411,8 @@ if "response_style" not in st.session_state:
     st.session_state.response_style = "Dengeli"
 if "response_length" not in st.session_state:
     st.session_state.response_length = "Orta"
+if "interaction_mode" not in st.session_state:
+    st.session_state.interaction_mode = "Dengeli yardımcı"
 if "theme_choice" not in st.session_state:
     st.session_state.theme_choice = "Gece moru"
 if "video_pack" not in st.session_state:
@@ -415,10 +427,8 @@ if "voice_rate" not in st.session_state:
     st.session_state.voice_rate = 1.0
 if "proactive_mode" not in st.session_state:
     st.session_state.proactive_mode = True
-if "niko_mode" not in st.session_state:
-    st.session_state.niko_mode = True
-if "niko_analysis_mode" not in st.session_state:
-    st.session_state.niko_analysis_mode = True
+if "smart_assistant_mode" not in st.session_state:
+    st.session_state.smart_assistant_mode = True
 
 def ensure_chat(module):
     """Keep multiple named conversations per workspace during the current Streamlit session."""
@@ -559,7 +569,7 @@ with st.sidebar:
     selected_module = module_keys[module_labels.index(selected_label)]
 
     web_search_enabled = st.checkbox("🌐 Canlı web araması", value=False, key="web_search_enabled")
-    st.checkbox("💜 Niko'dan ilham alan Lidya modu", value=True, key="niko_mode", help="Hızlı analiz, doğal sohbet ve işe yarar sonraki adımlar. Bu, dizideki Niko'nun birebir kopyası değildir.")
+    st.checkbox("💜 Akıllı asistan davranışı", value=True, key="smart_assistant_mode", help="Doğal sohbet, bağlamı takip etme, hızlı analiz ve uygulanabilir sonraki adımlar.")
     voice_output = st.checkbox(ui["voice"], value=False, key="voice_output")
 
     if selected_module in MODULES:
@@ -848,10 +858,11 @@ if selected_module == "⚙️ Ayarlar":
     st.selectbox("Tema", ["Gece moru", "Aydınlık"], key="theme_choice")
     st.selectbox("Yanıt tarzı", ["Dengeli", "Kısa ve doğrudan", "Ayrıntılı ve öğretici", "Yaratıcı"], key="response_style")
     st.selectbox("Yanıt uzunluğu", ["Kısa", "Orta", "Uzun"], key="response_length")
+    st.selectbox("Çalışma modu", ["Dengeli yardımcı", "Hızlı yanıt", "Analiz ve karar", "Araştırma", "Sesli sohbet"], key="interaction_mode")
     st.markdown("### 💜 Lidya'nın kişiliği ve hafızası")
     st.selectbox("Lidya'nın iletişim tarzı", ["Sıcak ve doğal", "Enerjik ve esprili", "Sakin ve analitik", "Kısa ve doğrudan"], key="lidya_personality")
     st.checkbox("Lidya gerektiğinde sonraki adımı önersin", key="proactive_mode", value=st.session_state.proactive_mode)
-    st.caption("Niko'dan ilham alan mod; hızlı analiz ve doğal sohbet yaklaşımıdır. Dizi karakterinin birebir kopyası veya oyuncunun sesi değildir.")
+    st.caption("Lidya'nın yanıt biçimi: doğal iletişim, bağlam takibi, dikkatli analiz ve işe yarar sonuçlar. Ses, cihazında kullanılabilen tarayıcı seslerine bağlıdır.")
     st.slider("Sesli yanıt hızı", min_value=0.7, max_value=1.3, step=0.1, key="voice_rate")
     st.caption("Lidya mevcut sohbetin bağlamını kullanır. Profil notlarını ve dışa aktardığın sohbet arşivini sonraki oturumlarda yeniden yükleyebilirsin.")
     st.text_area(
@@ -1090,8 +1101,8 @@ else:
 # ======================================================
 if selected_module in MODULES and selected_module not in ("🎬 Video Studio",):
     active_chat = current_chat(selected_module)
-    if st.session_state.get("niko_mode", True):
-        st.markdown("<div class='lab-banner'>💜 <b>Lidya Akıllı Asistan Modu</b> · hızlı analiz · doğal sohbet · gizlilik odaklı yardım</div>", unsafe_allow_html=True)
+    if st.session_state.get("smart_assistant_mode", True):
+        st.markdown("<div class='lab-banner'>💜 <b>Lidya Akıllı Asistan Modu</b> · bağlamı takip eder · analiz eder · sonraki adımı belirler</div>", unsafe_allow_html=True)
     st.markdown(f"#### 💬 {active_chat['name']}")
     messages = get_messages(selected_module)
     if messages:
