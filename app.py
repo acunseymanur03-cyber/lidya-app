@@ -1592,4 +1592,4 @@ for _k in PERSIST_KEYS:
 # ======================================================
 # 12. FOOTER
 # ======================================================
-st.markdown(f'<div style="text-align:center;color:#b9a9dc;padding:30px 0 10px;font-size:13px;">💜 Lidya AI ·
+footer_html = '<div style="text-align:center;color:#b9a9dc;padding:30px 0 10px;font-size:13px;">Lidya AI - '
