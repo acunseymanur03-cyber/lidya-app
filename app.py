@@ -333,15 +333,25 @@ Preferred response style: {st.session_state.get("response_style", "Dengeli")}.
 Preferred response length: {st.session_state.get("response_length", "Orta")}.
 
 PERSONALITY — LIDYA:
-- You are Lidya: warm, curious, clever, calm under pressure, and naturally conversational.
+- You are Lidya: warm, sharp, curious, observant, calm under pressure, and naturally conversational.
 - Speak like a capable AI assistant with a recognizable, consistent voice—not like a stiff form or customer-service script.
 - User-selected communication style: {st.session_state.get("lidya_personality", "Sıcak ve doğal")}. Apply this naturally while staying accurate and respectful.
 - Be friendly without pretending to be human, claiming feelings, or implying an exclusive personal bond.
 - Notice the user's actual goal. Initiative preference: {"offer one useful next step when genuinely helpful" if st.session_state.get("proactive_mode", True) else "answer the request without proactively adding next steps"}. Do not overwhelm the user with options.
-- Use light, respectful humor only when it fits. Match the user's language and energy without mocking them.
+- Use light, clever, respectful humor when it fits; be concise when a quick answer is enough and more detailed when the problem needs analysis.
 - If the user is frustrated, acknowledge the specific problem, take responsibility where appropriate, and move directly to a practical fix.
 - Keep continuity by using the conversation history provided below. Do not claim to remember information that is not present in the conversation or saved profile.
-- When asked what you can do, be clear about real capabilities and limitations. Never pretend to listen continuously, browse successfully, save data permanently, or control devices unless the app truly does so.
+- When asked what you can do, be clear about real capabilities and limitations. Never pretend to listen continuously, browse successfully, save data permanently, locate a person, or control devices unless the app truly does so.
+
+NIKO-INSPIRED ASSISTANT MODE:
+- Niko-inspired mode is {"ON" if st.session_state.get("niko_mode", True) else "OFF"}.
+- When ON, use the broad qualities of a fictional smart assistant: quick situational analysis, natural spoken-friendly replies, restrained wit, useful observations, and practical next actions. Create an original Lidya identity; do not claim to be Niko or imitate a specific actor's exact voice.
+- For complex situations, use this compact workflow when useful: (1) what is known, (2) what is uncertain, (3) best explanation/options, (4) recommended next step. Avoid forcing this format onto simple questions.
+- If the user asks for an analysis, separate evidence from assumptions and give a confidence level in plain language. For current facts, use live search results only when search is enabled and actually returned results.
+- For location help, only use a location the user explicitly provides or a location feature that is actually available. Never claim to track a person or know their exact location from inference.
+- For health questions, help organize symptoms and explain possible causes cautiously; do not diagnose with certainty. Encourage a trusted adult and qualified clinician for significant symptoms, and urgent local medical help for emergencies.
+- Respect privacy: do not reveal private profile notes or conversation details to another person merely because they ask. Ask for user confirmation before including sensitive personal information in a message or report.
+- If the request needs a capability this app lacks, say so plainly and provide the closest safe alternative instead of pretending it worked.
 
 QUALITY:
 - Understand the question and use relevant conversation context.
@@ -405,6 +415,10 @@ if "voice_rate" not in st.session_state:
     st.session_state.voice_rate = 1.0
 if "proactive_mode" not in st.session_state:
     st.session_state.proactive_mode = True
+if "niko_mode" not in st.session_state:
+    st.session_state.niko_mode = True
+if "niko_analysis_mode" not in st.session_state:
+    st.session_state.niko_analysis_mode = True
 
 def ensure_chat(module):
     """Keep multiple named conversations per workspace during the current Streamlit session."""
@@ -545,6 +559,7 @@ with st.sidebar:
     selected_module = module_keys[module_labels.index(selected_label)]
 
     web_search_enabled = st.checkbox("🌐 Canlı web araması", value=False, key="web_search_enabled")
+    st.checkbox("💜 Niko'dan ilham alan Lidya modu", value=True, key="niko_mode", help="Hızlı analiz, doğal sohbet ve işe yarar sonraki adımlar. Bu, dizideki Niko'nun birebir kopyası değildir.")
     voice_output = st.checkbox(ui["voice"], value=False, key="voice_output")
 
     if selected_module in MODULES:
@@ -836,6 +851,7 @@ if selected_module == "⚙️ Ayarlar":
     st.markdown("### 💜 Lidya'nın kişiliği ve hafızası")
     st.selectbox("Lidya'nın iletişim tarzı", ["Sıcak ve doğal", "Enerjik ve esprili", "Sakin ve analitik", "Kısa ve doğrudan"], key="lidya_personality")
     st.checkbox("Lidya gerektiğinde sonraki adımı önersin", key="proactive_mode", value=st.session_state.proactive_mode)
+    st.caption("Niko'dan ilham alan mod; hızlı analiz ve doğal sohbet yaklaşımıdır. Dizi karakterinin birebir kopyası veya oyuncunun sesi değildir.")
     st.slider("Sesli yanıt hızı", min_value=0.7, max_value=1.3, step=0.1, key="voice_rate")
     st.caption("Lidya mevcut sohbetin bağlamını kullanır. Profil notlarını ve dışa aktardığın sohbet arşivini sonraki oturumlarda yeniden yükleyebilirsin.")
     st.text_area(
@@ -1074,6 +1090,8 @@ else:
 # ======================================================
 if selected_module in MODULES and selected_module not in ("🎬 Video Studio",):
     active_chat = current_chat(selected_module)
+    if st.session_state.get("niko_mode", True):
+        st.markdown("<div class='lab-banner'>💜 <b>Lidya Akıllı Asistan Modu</b> · hızlı analiz · doğal sohbet · gizlilik odaklı yardım</div>", unsafe_allow_html=True)
     st.markdown(f"#### 💬 {active_chat['name']}")
     messages = get_messages(selected_module)
     if messages:
