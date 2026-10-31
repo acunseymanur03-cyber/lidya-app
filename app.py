@@ -48,6 +48,11 @@ LANGUAGES = {
     "العربية": "Arabic",
 }
 
+SPEECH_LANGS = {
+    "Türkçe": "tr-TR", "English": "en-US", "Français": "fr-FR", "Deutsch": "de-DE",
+    "Español": "es-ES", "Italiano": "it-IT", "日本語": "ja-JP", "العربية": "ar-SA",
+}
+
 MODULES = {
     "💜 Lidya": ("General Assistant", "Everyday questions, learning, research, writing and programming."),
     "📁 File Laboratory": ("File Laboratory", "Read and discuss supported text-based documents attached in chat."),
@@ -67,6 +72,9 @@ MODULES = {
     "🏠 Smart Devices": ("Smart Devices", "Plan safe smart-home integrations; do not claim to control devices."),
     "🎨 Image Studio": ("Image Studio", "Generate images and create detailed visual prompts."),
     "🎬 Video Studio": ("Video Studio", "Generate a short storyboard-style MP4 from AI-generated scene images, plus a production pack."),
+    "⚡ Quick Analysis": ("Quick Analysis", "Fast situation breakdown: what is happening, risk level, best next action."),
+    "📍 Location Helper": ("Location Helper", "Help with places, directions and sharing a location with trusted contacts, using only a location the user provides or shares. Never track anyone."),
+    "🩹 Symptom Organizer": ("Symptom Organizer", "Organize symptoms and explain possibilities cautiously. No diagnosis; give urgent-care guidance when needed."),
 }
 
 MODULE_LABELS = {
@@ -88,6 +96,9 @@ MODULE_LABELS = {
         "🏠 Smart Devices": "🏠 Akıllı Cihazlar",
         "🎨 Image Studio": "🎨 Görsel Atölyesi",
         "🎬 Video Studio": "🎬 Video Atölyesi",
+        "⚡ Quick Analysis": "⚡ Hızlı Analiz",
+        "📍 Location Helper": "📍 Konum Yardımcısı",
+        "🩹 Symptom Organizer": "🩹 Belirti Düzenleyici",
     },
     "العربية": {
         "💜 Lidya": "💜 ليديا",
@@ -108,6 +119,9 @@ MODULE_LABELS = {
         "🏠 Smart Devices": "🏠 الأجهزة الذكية",
         "🎨 Image Studio": "🎨 استوديو الصور",
         "🎬 Video Studio": "🎬 استوديو الفيديو",
+        "⚡ Quick Analysis": "⚡ تحليل سريع",
+        "📍 Location Helper": "📍 مساعد الموقع",
+        "🩹 Symptom Organizer": "🩹 منظّم الأعراض",
         "⚙️ Ayarlar": "⚙️ الإعدادات",
     }
 }
@@ -251,6 +265,16 @@ TEXT = {
     },
 }
 
+PERSONALITY_OPTIONS = ["Sıcak ve doğal", "Enerjik ve esprili", "Sakin ve analitik", "Kısa ve doğrudan", "Esprili yol arkadaşı"]
+
+RED_FLAGS = [
+    "göğüs ağrısı", "nefes alamıyorum", "nefes darlığı", "bilincini kaybetti", "bilinç kaybı",
+    "bayıldı", "felç", "konuşamıyor", "şiddetli kanama", "zehirlen", "intihar",
+    "kendime zarar", "havale", "kasılma", "ağır alerji", "yüzü kaydı",
+    "chest pain", "can't breathe", "cannot breathe", "unconscious", "stroke",
+    "severe bleeding", "overdose", "seizure",
+]
+
 # ======================================================
 # 3. API CLIENT
 # ======================================================
@@ -306,6 +330,8 @@ st.markdown("""
     border: 1px solid rgba(200,170,255,0.17);
     border-radius: 15px;
 }
+.action-link { display:block; text-align:center; padding:10px 14px; margin:6px 0; border-radius:12px; border:1px solid rgba(203,174,255,.4); background:rgba(139,84,237,.18); color:#f4efff !important; text-decoration:none; font-weight:600; }
+.action-link.urgent { background:rgba(220,60,80,.25); border-color:rgba(255,120,130,.6); }
 footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -316,14 +342,25 @@ if st.session_state.get("theme_choice") == "Aydınlık":
     .stApp { background: linear-gradient(145deg, #f8f3ff, #edf5ff) !important; color: #241b35 !important; }
     [data-testid="stSidebar"] { background: #f0e9fa !important; }
     [data-testid="stChatMessage"] { background: rgba(255,255,255,.88) !important; border-color: #d9c8ee !important; }
+    .action-link { color:#241b35 !important; }
     </style>
     """, unsafe_allow_html=True)
 
 # ======================================================
 # 5. SYSTEM INSTRUCTIONS
 # ======================================================
+COMPANION_STYLE = """
+COMPANION STYLE (active):
+- Be a witty, loyal, quick-thinking companion: light teasing that is always kind, and warm reactions to the user's mood.
+- Short, punchy sentences. React first in one short phrase, then help.
+- Notice emotional cues and respond to them before the task.
+- In urgent or risky situations drop the jokes completely: give clear numbered steps, and for health or safety danger tell the user to contact local emergency services.
+- Never claim to track people, imitate real people's voices, or diagnose.
+"""
+
 def build_system_instruction(module, language):
     module_name, module_description = MODULES[module]
+    companion = COMPANION_STYLE if st.session_state.get("lidya_personality") == "Esprili yol arkadaşı" else ""
     return f"""
 You are Lidya AI, a thoughtful, accurate and helpful assistant.
 Current workspace: {module_name}
@@ -347,7 +384,7 @@ PERSONALITY — LIDYA:
 - If the user is frustrated, acknowledge the specific problem, take responsibility where appropriate, and move directly to a practical fix.
 - Keep continuity by using the conversation history provided below. Do not claim to remember information that is not present in the conversation or saved profile.
 - When asked what you can do, be clear about real capabilities and limitations. Never pretend to listen continuously, browse successfully, save data permanently, locate a person, or control devices unless the app truly does so.
-
+{companion}
 SMART ASSISTANT BEHAVIOR:
 - Smart assistant mode is {"ON" if st.session_state.get("smart_assistant_mode", True) else "OFF"}.
 - When ON, behave like an attentive, capable digital assistant: understand the situation quickly, notice relevant details, connect ideas across the current conversation, and move from explanation to a practical result.
@@ -425,10 +462,14 @@ if "lidya_personality" not in st.session_state:
     st.session_state.lidya_personality = "Sıcak ve doğal"
 if "voice_rate" not in st.session_state:
     st.session_state.voice_rate = 1.0
+if "voice_pitch" not in st.session_state:
+    st.session_state.voice_pitch = 1.0
 if "proactive_mode" not in st.session_state:
     st.session_state.proactive_mode = True
 if "smart_assistant_mode" not in st.session_state:
     st.session_state.smart_assistant_mode = True
+if "emergency_contacts" not in st.session_state:
+    st.session_state.emergency_contacts = []
 
 def ensure_chat(module):
     """Keep multiple named conversations per workspace during the current Streamlit session."""
@@ -543,6 +584,86 @@ def create_slideshow_video(scene_images, scene_captions, seconds_per_scene=2, fp
     with open(path, "rb") as f:
         return f.read()
 
+
+# ---------- New helpers: safety, location, contacts, quick LLM ----------
+def has_red_flag(text):
+    t = (text or "").lower()
+    return any(k in t for k in RED_FLAGS)
+
+
+def geocode_place(query):
+    """Find coordinates for an address/place the user typed (OpenStreetMap Nominatim)."""
+    r = requests.get(
+        "https://nominatim.openstreetmap.org/search",
+        params={"q": query, "format": "json", "limit": 1},
+        headers={"User-Agent": "LidyaAI/1.0"},
+        timeout=10,
+    )
+    r.raise_for_status()
+    data = r.json()
+    if not data:
+        return None
+    return float(data[0]["lat"]), float(data[0]["lon"]), data[0].get("display_name", "")
+
+
+        max_completion_tokens=max_tokens,
+    )
+    return res.choices[0].message.content or ""
+
+
+def clean_phone(phone):
+    return re.sub(r"[^\d+]", "", phone or "")
+
+
+def wa_number(phone):
+    return re.sub(r"\D", "", phone or "")
+
+
+def render_hey_lidya_listener(enabled, language_name):
+    """Browser-side wake phrase listener. Works only while this page is open and the user allowed the microphone.
+    Say e.g. 'Hey Lidya, bugün hava nasıl?' in one sentence; the text after the wake phrase is sent to the chat."""
+    lang = SPEECH_LANGS.get(language_name, "tr-TR")
+    if not enabled:
+        script = """<script>
+        try { const p = window.parent; if (p.__lidyaRec) { p.__lidyaRec.__stopped = true; p.__lidyaRec.stop(); p.__lidyaRec = null; } } catch (e) {}
+        </script>"""
+        components.html(script, height=0)
+        return
+    script = """<script>
+    (function () {
+      const p = window.parent;
+      const doc = p.document;
+      const SR = p.SpeechRecognition || p.webkitSpeechRecognition || window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { return; }
+      if (p.__lidyaRec) { try { p.__lidyaRec.__stopped = true; p.__lidyaRec.stop(); } catch (e) {} }
+      const rec = new SR();
+      rec.lang = "__LANG__";
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.__stopped = false;
+      p.__lidyaRec = rec;
+      const wake = /(hey|hay|hei|selam|merhaba)\\s+(lidya|lidia|lydia|lidiya|ليديا)/i;
+          if (b) { b.click(); }
+        }, 350);
+      }
+      rec.onresult = function (e) {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (!e.results[i].isFinal) { continue; }
+          const t = e.results[i][0].transcript.trim();
+          const m = t.match(wake);
+          if (m) {
+            const rest = t.slice(m.index + m[0].length).replace(/^[\\s,.:;!\\-]+/, '');
+            if (rest.length > 2) { send(rest); }
+          }
+        }
+      };
+      rec.onend = function () { if (!rec.__stopped) { try { rec.start(); } catch (e) {} } };
+      rec.onerror = function () {};
+      try { rec.start(); } catch (e) {}
+    })();
+    </script>""".replace("__LANG__", lang)
+    components.html(script, height=0)
+
 # ======================================================
 # 7. SIDEBAR
 # ======================================================
@@ -571,6 +692,8 @@ with st.sidebar:
     web_search_enabled = st.checkbox("🌐 Canlı web araması", value=False, key="web_search_enabled")
     st.checkbox("💜 Akıllı asistan davranışı", value=True, key="smart_assistant_mode", help="Doğal sohbet, bağlamı takip etme, hızlı analiz ve uygulanabilir sonraki adımlar.")
     voice_output = st.checkbox(ui["voice"], value=False, key="voice_output")
+    hey_lidya_on = st.checkbox("🎙️ “Hey Lidya” dinleme (bu sekme açıkken)", value=False, key="hey_lidya_on",
+                               help="Tarayıcı mikrofon izni ister. Örn: “Hey Lidya, bugün ne çalışsam?” de. Chrome, Edge ve Safari'de çalışır; sekme açıkken dinler.")
 
     if selected_module in MODULES:
         active = ensure_chat(selected_module)
@@ -592,13 +715,6 @@ with st.sidebar:
             st.session_state.current_chat_by_module[selected_module] = selected_id
             st.rerun()
         active = current_chat(selected_module)
-        rename_value = st.text_input("Sohbet adı", value=active["name"], key=f"rename_input_{selected_module}_{active['id']}")
-        if st.button("✏️ Sohbeti yeniden adlandır", use_container_width=True, key=f"rename_btn_{selected_module}_{active['id']}"):
-            clean_name = rename_value.strip()[:60]
-            if clean_name:
-                active["name"] = clean_name
-                st.rerun()
-        if st.button("🧹 Bu sohbetin mesajlarını temizle", use_container_width=True, key=f"clear_chat_{selected_module}_{active['id']}"):
             active["messages"] = []
             st.session_state.last_answer = ""
             st.rerun()
@@ -615,6 +731,11 @@ st.markdown('<div class="orb"></div>', unsafe_allow_html=True)
 if selected_module in MODULES:
     module_title, module_description = MODULES[selected_module]
     st.markdown(f'<div class="lab-banner"><strong>{module_title}</strong><br><span style="opacity:.88">{module_description}</span></div>', unsafe_allow_html=True)
+
+# Wake phrase listener only in chat workspaces.
+render_hey_lidya_listener(
+    bool(st.session_state.get("hey_lidya_on", False)) and selected_module in MODULES and selected_module not in ("🎬 Video Studio",),
+)
 
 def render_module_simulation(module):
     """Small, interactive educational lab tailored to the active workspace."""
@@ -636,7 +757,6 @@ def render_module_simulation(module):
         chosen = st.selectbox("Üniversiteyi keşfet", list(universities.keys()), key="uni_lab_choice")
         info = universities[chosen]
         col_logo, col_info = st.columns([1, 2])
-        with col_logo:
             # Try the logo service, then the domain favicon. If both fail, show a graceful branded fallback.
             logo_bytes = None
             for logo_url in (f"https://logo.clearbit.com/{info['domain']}?size=256", f"https://www.google.com/s2/favicons?domain={info['domain']}&sz=256"):
@@ -657,9 +777,6 @@ def render_module_simulation(module):
             st.write(info["focus"])
             st.caption(f"Bölge: {info['region']} · Finansman: {info['aid']}")
             st.link_button("🌐 Resmî üniversite sitesi", info["url"], use_container_width=True)
-            if st.button("⭐ Hedef listeme ekle", key="uni_add_" + info["domain"], use_container_width=True):
-                if chosen not in st.session_state.uni_shortlist:
-                    st.session_state.uni_shortlist.append(chosen)
                 st.success("Hedef listene eklendi.")
         st.markdown("#### 🔎 Üniversiteleri karşılaştır")
         compare = st.multiselect("Karşılaştırmak istediğin üniversiteler", list(universities.keys()), default=["Harvard University", "University of Oxford"], key="uni_compare")
@@ -680,16 +797,6 @@ def render_module_simulation(module):
         milestones = ["Üniversite ve bölüm listesi", "Akademik belgeler", "Dil ve sınav politikası", "Essay ve proje portföyü", "Maddi yardım belgeleri", "Başvuruyu son kez kontrol et"]
         completed = st.multiselect("Tamamladığın adımlar", milestones, key="uni_milestones")
         st.progress(len(completed) / len(milestones), text=f"Başvuru hazırlığı: {len(completed)}/{len(milestones)} adım")
-        if st.button("🗺️ Kişisel yol haritamı göster", key="uni_roadmap"):
-            plans = {"Keşif":"3–5 üniversite seç; her biri için resmî bölüm ve kabul sayfalarını kaydet.", "Akademik hazırlık":"Transkriptini, derslerini ve mezuniyet belgelerini düzenle.", "Sınav ve dil planı":"Güncel test politikasını resmî kaynaktan kontrol et; muafiyet varsayma.", "Essay ve etkinlikler":"Projelerini, öğrendiklerini ve etkisini somut örneklerle belgele.", "Başvuru gönderimi":"Her başvurunun belge listesi, son tarihi ve gönderim onayını ayrı ayrı kontrol et."}
-            st.success(f"{target_year} başlangıcı için önerilen sonraki adım: {plans[stage]}")
-        st.info("Bu panel başvuru takibi içindir; kabul veya burs garantisi vermez. Gereklilikler, tarihler ve finansman politikaları değişebilir. Her bilgiyi başvurmadan önce ilgili üniversitenin resmî sayfasında doğrula.")
-
-    elif module == "🩺 Medical & Anatomy":
-        st.markdown("### 🩺 Anatomi etkileşim laboratuvarı")
-        organ = st.selectbox("İncelenecek sistem", ["Kalp ve dolaşım", "Akciğerler ve solunum", "Beyin ve sinir sistemi", "Böbrekler ve boşaltım", "Hücre zarı"], key="med_sim_organ")
-        if organ == "Kalp ve dolaşım":
-            hr = st.slider("Örnek kalp hızı (atım/dk)", 45, 150, 72, key="med_hr")
             systolic = st.slider("Örnek sistolik basınç (mmHg)", 80, 180, 120, key="med_bp")
             st.metric("Dakikadaki atım", f"{hr} bpm")
             st.progress(min(hr / 150, 1.0), text="Kalp hızı göstergesi — eğitim amaçlı")
@@ -710,31 +817,6 @@ def render_module_simulation(module):
             initial = st.slider("Başlangıç sıcaklığı (°C)", 30, 100, 90, key="cool_init")
             ambient = st.slider("Ortam sıcaklığı (°C)", 0, 35, 22, key="cool_ambient")
             k = st.slider("Soğuma katsayısı", 0.01, 0.2, 0.05, 0.01, key="cool_k")
-            t = np.linspace(0, 60, 200); temp = ambient + (initial-ambient)*np.exp(-k*t)
-            fig, ax = plt.subplots(); ax.plot(t, temp); ax.set_xlabel("Dakika"); ax.set_ylabel("Sıcaklık (°C)"); ax.grid(True, alpha=.25); st.pyplot(fig, use_container_width=True)
-        elif experiment == "Fotosentezde ışık":
-            light = st.slider("Göreli ışık şiddeti", 0, 100, 50, key="photo_light")
-            st.progress(light/100, text="Göreli ışık şiddeti")
-            st.write(f"Basit öğretici modelde göreli hız: {100*light/(light+25):.1f}% (gerçek bitkilerde sonuç başka etkenlere de bağlıdır).")
-        else:
-            ph = st.slider("pH", 0.0, 14.0, 7.0, 0.5, key="ph_sim")
-            st.metric("Çözelti", "Asidik" if ph < 7 else "Bazik" if ph > 7 else "Nötr")
-
-    elif module == "⚙️ Engineering":
-        st.markdown("### ⚙️ Mühendislik tasarım masası")
-        tab1, tab2 = st.tabs(["Köprü", "Elektrik devresi"])
-        with tab1:
-            span = st.slider("Köprü açıklığı (m)", 5, 50, 20, key="bridge_span")
-            load = st.slider("Ortadaki yük (kN)", 1, 100, 20, key="bridge_load")
-            st.metric("Basit simetrik modelde her mesnette tepki", f"{load/2:.1f} kN")
-            st.caption(f"Açıklık: {span} m. Bu yalnızca basitleştirilmiş statik örnektir; gerçek tasarım hesabı değildir.")
-        with tab2:
-            voltage = st.slider("Gerilim (V)", 1, 24, 12, key="circuit_v")
-            resistance = st.slider("Direnç (Ω)", 1, 100, 12, key="circuit_r")
-            st.metric("Akım (Ohm yasası)", f"{voltage/resistance:.3f} A")
-            st.metric("Güç", f"{voltage**2/resistance:.2f} W")
-
-    elif module == "💻 Software Engineering":
         st.markdown("### 💻 Algoritma laboratuvarı")
         algorithm = st.selectbox("Algoritma", ["Doğrusal arama", "İkili arama", "Kabarcık sıralama"], key="algo_sim")
         raw = st.text_input("Sayıları virgülle yaz", "8, 3, 11, 2, 7", key="algo_values")
@@ -756,213 +838,48 @@ def render_module_simulation(module):
                     if ordered[mid] < target: lo=mid+1
                     else: hi=mid-1
                 st.write("Sıralanmış liste:", ordered); st.code("\n".join(trace) if trace else "Liste boş")
+        situation = st.text_area("Durumu kısaca yaz", key="qa_situation", height=110, placeholder="Ne oldu? Ne istiyorsun? Zaman baskısı var mı?")
+        if st.button("⚡ Analiz et", key="qa_run", use_container_width=True):
+            if not situation.strip():
+                st.warning("Önce durumu yaz.")
             else:
-                arr = values[:]; passes=[]
-                for i in range(len(arr)):
-                    changed=False
-                    for j in range(0, len(arr)-i-1):
-                        if arr[j] > arr[j+1]: arr[j],arr[j+1]=arr[j+1],arr[j]; changed=True
-                    passes.append(f"Tur {i+1}: {arr}")
-                    if not changed: break
-                st.code("\n".join(passes) if passes else "Liste boş")
-                st.success(f"Sonuç: {arr}")
-        except ValueError:
-            st.warning("Yalnızca virgülle ayrılmış tam sayılar gir.")
-
-    elif module == "🌍 Language Teacher":
-        st.markdown("### 🌍 Dil pratiği simülatörü")
-        scenario = st.selectbox("Durum", ["Üniversite mülakatı", "Kafede sipariş", "Yeni biriyle tanışma", "Profesörden bilgi isteme"], key="lang_scenario")
-        level = st.select_slider("Pratik seviyesi", options=["A1", "A2", "B1", "B2", "C1"], value="A2", key="lang_level")
-        prompts = {"Üniversite mülakatı":"Tell me about yourself and one project you are proud of.", "Kafede sipariş":"Hello! What would you like to order?", "Yeni biriyle tanışma":"Hi! What do you enjoy learning about?", "Profesörden bilgi isteme":"What research topic are you interested in, and why?"}
-        st.info(f"**{scenario} · {level}**\n\n{prompts[scenario]}")
-        st.caption("Yanıtını hedef dilde yazıp aşağıdaki sohbette Lidya'dan düzeltme ve açıklama isteyebilirsin.")
-
-    elif module == "📊 Data Analysis":
-        st.markdown("### 📊 Veri keşif masası")
-        raw = st.text_input("Örnek değerler (virgülle)", "12, 15, 18, 21, 24, 30", key="data_sim_values")
-        try:
-            vals = np.array([float(x.strip()) for x in raw.split(",") if x.strip()])
-            if len(vals):
-                c1,c2,c3 = st.columns(3); c1.metric("Ortalama", f"{np.mean(vals):.2f}"); c2.metric("Medyan", f"{np.median(vals):.2f}"); c3.metric("Standart sapma", f"{np.std(vals):.2f}")
-                fig, ax = plt.subplots(); ax.plot(range(1,len(vals)+1), vals, marker="o"); ax.set_xlabel("Gözlem"); ax.set_ylabel("Değer"); ax.grid(True, alpha=.25); st.pyplot(fig, use_container_width=True)
-        except ValueError: st.warning("Sayıları virgülle ayırarak gir.")
-
-    elif module == "📊 Business & Economics":
-        st.markdown("### 💼 Sanal işletme simülatörü")
-        revenue = st.slider("Aylık gelir (₺)", 0, 200000, 50000, 1000, key="biz_rev")
-        costs = st.slider("Aylık gider (₺)", 0, 200000, 30000, 1000, key="biz_cost")
-        marketing = st.slider("Pazarlama bütçesi (₺)", 0, 50000, 5000, 500, key="biz_marketing")
-        profit = revenue-costs-marketing
-        c1,c2=st.columns(2); c1.metric("Tahmini net sonuç", f"₺{profit:,.0f}"); c2.metric("Kâr marjı", f"{(profit/revenue*100):.1f}%" if revenue else "Gelir yok")
-        st.caption("Öğrenme amaçlı varsayımsal model; gerçek finansal tavsiye değildir.")
-
-    elif module == "🔐 Cybersecurity":
-        st.markdown("### 🔐 Savunma odaklı güvenlik laboratuvarı")
-        password = st.text_input("Örnek parola gücü denetimi (gerçek parolanı girme)", type="password", key="cyber_demo_password")
-        score = sum([len(password)>=12, bool(re.search(r"[a-z]",password) and re.search(r"[A-Z]",password)), bool(re.search(r"\d",password)), bool(re.search(r"[^A-Za-z0-9]",password))])
-        st.progress(score/4, text=f"Örnek güç göstergesi: {score}/4")
-        st.caption("Gerçek parolanı yazma. Bu yalnızca yerel, basitleştirilmiş bir gösterge; parolayı hiçbir yere göndermemelidir.")
-
-    elif module == "🏠 Smart Devices":
-        st.markdown("### 🏠 Sanal akıllı ev paneli")
-        temp = st.slider("Oda sıcaklığı (°C)", 10, 35, 22, key="smart_temp")
-        light = st.toggle("Sanal ışık", key="smart_light")
-        heater = st.toggle("Sanal ısıtıcı", key="smart_heater")
-        c1,c2=st.columns(2); c1.metric("Sıcaklık", f"{temp} °C"); c2.metric("Işık", "Açık" if light else "Kapalı")
-        st.info("Bu sanal panel yalnızca arayüz demosudur; gerçek cihazlara bağlanmaz.")
-
-    elif module == "📚 Education":
-        st.markdown("### 📚 Öğrenme kontrol noktası")
-        subject = st.selectbox("Konu", ["Biyoloji", "Tarih", "İngilizce", "Matematik", "Coğrafya"], key="edu_subject")
-        if subject == "Biyoloji": q, opts, correct = "Hücre zarının temel yapısı hangisidir?", ["Fosfolipit çift tabaka", "Selüloz duvar", "Saf DNA"], 0
-        elif subject == "Tarih": q, opts, correct = "Tarihî bir iddiayı değerlendirirken en güçlü yaklaşım hangisidir?", ["Tek bir söylenti", "Birden fazla güvenilir kaynak", "Kaynağı kontrol etmemek"], 1
-        elif subject == "İngilizce": q, opts, correct = "‘I ___ a student.’ boşluğuna hangisi gelir?", ["am", "are", "be"], 0
-        elif subject == "Matematik": q, opts, correct = "3x = 18 ise x kaçtır?", ["3", "6", "9"], 1
-        else: q, opts, correct = "Ekvator Dünya'yı hangi iki yarımküreye ayırır?", ["Doğu-Batı", "Kuzey-Güney", "Kara-Deniz"], 1
-        st.write(q); answer = st.radio("Yanıtın", opts, key="edu_answer")
-        if st.button("Yanıtı kontrol et", key="edu_check"):
-            if opts.index(answer) == correct: st.success("Doğru! Güzel ilerliyorsun.")
-            else: st.warning(f"Tekrar dene. Doğru yanıt: {opts[correct]}")
-
-    elif module == "⚖️ Legal Research":
-        st.markdown("### ⚖️ Hukuki argüman inceleme")
-        scenario = st.selectbox("Kurgusal durum", ["İade talebi", "Kira anlaşmazlığı", "Dijital gizlilik"], key="legal_scenario")
-        st.info({"İade talebi":"Alıcı, ürünü teslim aldıktan sonra iade etmek istiyor. Önce ülke, satın alma kanalı ve süre koşullarını belirle.", "Kira anlaşmazlığı":"Kiracı ve ev sahibi arasında depozito uyuşmazlığı var. Sözleşme ve yerel mevzuat önemlidir.", "Dijital gizlilik":"Bir uygulama kullanıcı verisi topluyor. Hangi verinin, hangi amaçla ve hangi hukuki dayanakla işlendiğini sor."}[scenario])
-        st.caption("Genel eğitim amaçlıdır; gerçek hukuki danışmanlık değildir.")
-
-    elif module == "✍️ Writing & Creativity":
-        st.markdown("### ✍️ Yaratıcı yazı laboratuvarı")
-        genre = st.selectbox("Tür", ["Bilim kurgu", "Gizem", "Deneme", "Kısa öykü", "Şiir fikri"], key="writing_genre")
-        mood = st.select_slider("Atmosfer", options=["Sakin", "Merak uyandıran", "Gerilimli", "Umutlu"], value="Merak uyandıran", key="writing_mood")
-        seed = st.text_input("Hikâye tohumu", "Bir gün okul laboratuvarında bilinmeyen bir sinyal bulundu…", key="writing_seed")
-        st.write(f"**Yazı kıvılcımı:** {genre} · {mood}: {seed}")
-
-    elif module == "📁 File Laboratory":
-        st.markdown("### 📁 Dosya laboratuvarı")
-        st.caption("PDF, DOCX, TXT, MD, CSV, JSON ve PY dosyalarını sohbet kutusundan ekleyip özetleme, kavram çıkarma, karşılaştırma veya soru-cevap iste. Metin çıkarımı sınırlı uzunlukta yapılır; taranmış PDF ve görseller her zaman okunamayabilir.")
-        task = st.selectbox("Dosya inceleme görevi", ["Özetle", "Anahtar kavramları çıkar", "İki dosyayı karşılaştır", "Sorular hazırla"], key="file_sim_task")
-        st.write(f"Seçilen iş akışı: **{task}**. Dosyayı aşağıdaki sohbet alanından ekleyebilirsin.")
-
-    elif module == "💜 Lidya":
-        st.markdown("### 💜 Lidya keşif masası")
-        goal = st.selectbox("Bugün ne üretelim?", ["Bir fikri projeye dönüştür", "Bir konuyu öğren", "Bir metin geliştir", "Bir kod hatasını çöz", "Bir araştırma planla"], key="lidya_goal")
-        st.write("Seçimin:", goal, "— aşağıdaki sohbette bu hedefle başlayabilirsin.")
-
-# Show the matching simulation before the workspace chat.
-if selected_module in MODULES and selected_module not in ("📐 Mathematics", "🎬 Video Studio", "🎨 Image Studio"):
-    render_module_simulation(selected_module)
-
-if selected_module == "⚙️ Ayarlar":
-    st.title("⚙️ Ayarlar")
-    st.write("Lidya'nın çalışma biçimini kişiselleştir.")
-    st.selectbox("Tema", ["Gece moru", "Aydınlık"], key="theme_choice")
-    st.selectbox("Yanıt tarzı", ["Dengeli", "Kısa ve doğrudan", "Ayrıntılı ve öğretici", "Yaratıcı"], key="response_style")
-    st.selectbox("Yanıt uzunluğu", ["Kısa", "Orta", "Uzun"], key="response_length")
-    st.selectbox("Çalışma modu", ["Dengeli yardımcı", "Hızlı yanıt", "Analiz ve karar", "Araştırma", "Sesli sohbet"], key="interaction_mode")
-    st.markdown("### 💜 Lidya'nın kişiliği ve hafızası")
-    st.selectbox("Lidya'nın iletişim tarzı", ["Sıcak ve doğal", "Enerjik ve esprili", "Sakin ve analitik", "Kısa ve doğrudan"], key="lidya_personality")
-    st.checkbox("Lidya gerektiğinde sonraki adımı önersin", key="proactive_mode", value=st.session_state.proactive_mode)
-    st.caption("Lidya'nın yanıt biçimi: doğal iletişim, bağlam takibi, dikkatli analiz ve işe yarar sonuçlar. Ses, cihazında kullanılabilen tarayıcı seslerine bağlıdır.")
-    st.slider("Sesli yanıt hızı", min_value=0.7, max_value=1.3, step=0.1, key="voice_rate")
-    st.caption("Lidya mevcut sohbetin bağlamını kullanır. Profil notlarını ve dışa aktardığın sohbet arşivini sonraki oturumlarda yeniden yükleyebilirsin.")
-    st.text_area(
-        "Lidya'nın hatırlamasını istediğin genel tercihler ve hedefler",
-        key="lidya_memory_notes",
-        height=140,
-        placeholder="Örn. Tercih ettiğim dil Türkçe. Açıklamalar adım adım olsun. Üzerinde çalıştığım proje: ...",
-        help="Parola, adres, kimlik numarası veya özel sağlık bilgisi gibi hassas bilgileri yazma.",
-    )
-    profile_payload = json.dumps({"version": 1, "profile_notes": st.session_state.lidya_memory_notes}, ensure_ascii=False, indent=2)
-    st.download_button(
-        "💾 Hafıza profilini indir",
-        data=profile_payload,
-        file_name="lidya_profile.json",
-        mime="application/json",
-        use_container_width=True,
-    )
-    uploaded_profile = st.file_uploader("Önceden indirdiğin Lidya profilini yükle", type=["json"], key="lidya_profile_upload")
-    if uploaded_profile is not None and st.button("Profil notlarını içe aktar", key="lidya_import_profile"):
-        try:
-            loaded_profile = json.loads(uploaded_profile.getvalue().decode("utf-8"))
-            notes = loaded_profile.get("profile_notes", "")
-            if not isinstance(notes, str):
-                raise ValueError("Profil notları metin biçiminde olmalı.")
-            st.session_state.lidya_memory_notes = notes[:4000]
-            st.success("Profil notları bu oturuma aktarıldı.")
-            st.rerun()
-        except (json.JSONDecodeError, UnicodeDecodeError, ValueError, AttributeError):
-            st.error("Bu profil dosyası okunamadı. Lidya'nın indirdiği geçerli JSON dosyasını seç.")
-    st.markdown("### 🧠 Sohbetlerden hafıza önerisi")
-    st.caption("Lidya, son konuşmalarından kısa bir profil özeti çıkarabilir. Kaydetmeden önce özeti sen kontrol edersin.")
-    if st.button("Son sohbetlerden hafıza özeti hazırla", use_container_width=True, key="make_memory_summary"):
-        recent_items = []
-        for module_name, chat_list in st.session_state.chats_by_module.items():
-            for chat_item in chat_list:
-                for msg in chat_item.get("messages", [])[-8:]:
-                    if msg.get("role") in ("user", "assistant"):
-                        recent_items.append(f"[{module_name} / {msg['role']}] {msg.get('content', '')[:900]}")
-        recent_items = recent_items[-40:]
-        if not recent_items:
-            st.warning("Özetlenecek sohbet bulunamadı.")
-        elif client is None:
-            st.error(ui["no_key"])
+                if has_red_flag(situation):
+                    st.markdown("<a class='action-link urgent' href='tel:112'>🚨 Hayati risk varsa hemen 112'yi ara</a>", unsafe_allow_html=True)
+                if client is None:
+                    st.error(TEXT[st.session_state.get("interface_language", "Türkçe")]["no_key"])
+                else:
+                    lang_name = LANGUAGES[st.session_state.get("interface_language", "Türkçe")]
+                    with st.spinner("Analiz ediliyor…"):
+                        try:
+                            out = quick_llm(
+                                f"You are a fast, sharp situation analyst. Reply in {lang_name}. Format: "
+                                "1) Durum (1-2 sentences) 2) Risk seviyesi: low/medium/high + why "
+                                "3) Bilinenler vs. bilinmeyenler 4) En iyi sonraki adım (one clear action) "
+                                "5) Alternatif (optional, one line). Be brief and concrete. "
+                                "If there is danger to life or health, say to contact local emergency services first. "
+                                "Never invent facts.",
+                                situation,
+            st.info("Önce en az bir güvendiğin kişi ekle.")
+        elif map_link is None:
+            st.info("Konum paylaşmak için yukarıda bir konum seç veya yaz.")
         else:
-            try:
-                with st.spinner("Lidya önemli ve hassas olmayan tercihleri ayıklıyor…"):
-                    summary_result = client.chat.completions.create(
-                        model=MODEL_NAME,
-                        messages=[
-                            {"role": "system", "content": "Create a concise user-approved memory draft from the conversation excerpts. Keep only stable preferences, ongoing projects, and goals that are explicitly supported. Exclude sensitive personal data, guesses, and assistant claims. Write in Turkish, use bullets, and never imply anything has been permanently saved."},
-                            {"role": "user", "content": "Create a draft only; the user will review it:\n\n" + "\n".join(recent_items)},
-                        ],
-                        temperature=0.2,
-                        max_completion_tokens=700,
-                    )
-                st.session_state.memory_summary_draft = summary_result.choices[0].message.content or ""
-            except Exception as exc:
-                st.error(f"Hafıza özeti hazırlanamadı: {type(exc).__name__}")
-    if st.session_state.get("memory_summary_draft"):
-        reviewed_memory = st.text_area("Kontrol et ve gerekirse düzenle", value=st.session_state.memory_summary_draft, key="reviewed_memory_summary", height=140)
-        if st.button("Kontrol ettiğim özeti profil notlarına ekle", key="save_memory_summary"):
-            existing_notes = st.session_state.lidya_memory_notes.strip()
-            st.session_state.lidya_memory_notes = (existing_notes + "\n\n" + reviewed_memory.strip()).strip()[:4000]
-            st.session_state.memory_summary_draft = ""
-            st.success("Özet profil notlarına eklendi. Kalıcı olarak saklamak için profil dosyasını indir.")
-            st.rerun()
+            who = st.selectbox("Kime?", [p["name"] for p in contacts], key="share_to")
+            note = st.text_input("Mesaj", value="Şu an buradayım:", key="share_note")
+            person = next(p for p in contacts if p["name"] == who)
+            body = f"{note.strip()} {map_link}".strip()
+            body_q = urllib.parse.quote(body)
+            st.code(body, language=None)
+            st.link_button("💬 WhatsApp ile gönder", f"https://wa.me/{wa_number(person['phone'])}?text={body_q}", use_container_width=True)
+            st.markdown(
+                f"<a class='action-link' href='sms:{person['phone']}?&body={body_q}'>✉️ SMS taslağı aç</a>"
+                f"<a class='action-link' href='tel:{person['phone']}'>📞 {person['name']} kişisini ara</a>",
+                unsafe_allow_html=True,
+            )
+        st.markdown("<a class='action-link urgent' href='tel:112'>🚨 Acil durum: 112'yi ara</a>", unsafe_allow_html=True)
+        st.caption("Acil yardım için yerel acil çağrı numarasını kullan (Türkiye: 112).")
 
-    st.markdown("### 💬 Sohbet arşivi")
-    archive_payload = json.dumps({
-        "version": 1,
-        "chats_by_module": st.session_state.chats_by_module,
-        "current_chat_by_module": st.session_state.current_chat_by_module,
-    }, ensure_ascii=False, indent=2)
-    st.download_button("📥 Tüm sohbetleri JSON olarak indir", data=archive_payload, file_name="lidya_chat_archive.json", mime="application/json", use_container_width=True)
-    uploaded_archive = st.file_uploader("Önceki Lidya sohbet arşivini yükle", type=["json"], key="lidya_chat_archive_upload")
-    if uploaded_archive is not None and st.button("Sohbet arşivini içe aktar", key="import_lidya_chat_archive"):
-        try:
-            archive = json.loads(uploaded_archive.getvalue().decode("utf-8"))
-            incoming_chats = archive.get("chats_by_module", {})
-            if not isinstance(incoming_chats, dict):
-                raise ValueError("Sohbet arşivi biçimi geçersiz.")
-            valid_chats = {}
-            for module_name, chat_list in incoming_chats.items():
-                if module_name not in MODULES or not isinstance(chat_list, list):
-                    continue
-                cleaned = []
-                for chat_item in chat_list[:100]:
-                    if not isinstance(chat_item, dict) or not isinstance(chat_item.get("messages", []), list):
-                        continue
-                    clean_messages = []
-                    for msg in chat_item.get("messages", [])[-500:]:
-                        if isinstance(msg, dict) and msg.get("role") in ("user", "assistant") and isinstance(msg.get("content", ""), str):
-                            clean_messages.append({"role": msg["role"], "content": msg["content"][:18000], "time": str(msg.get("time", ""))[:40]})
-                    cleaned.append({"id": str(chat_item.get("id", uuid.uuid4().hex[:10]))[:40], "name": str(chat_item.get("name", "Imported chat"))[:100], "messages": clean_messages})
-                valid_chats[module_name] = cleaned
-            st.session_state.chats_by_module = valid_chats
-            st.session_state.current_chat_by_module = {k: str(v) for k, v in archive.get("current_chat_by_module", {}).items() if k in MODULES and isinstance(v, str)}
-            st.success("Sohbet arşivi bu oturuma aktarıldı.")
-            st.rerun()
-        except (json.JSONDecodeError, UnicodeDecodeError, ValueError, AttributeError) as exc:
+    elif module == "🩹 Symptom Organizer":
+        st.markdown("### 🩹 Belirti düzenleyici")
             st.error(f"Arşiv okunamadı: {type(exc).__name__}")
 
     st.info("API anahtarları yalnızca Streamlit Cloud → Settings → Secrets bölümünde tutulmalı; kod içine yazılmamalı.")
@@ -984,61 +901,6 @@ elif selected_module == "📐 Mathematics":
         c = c3.slider("c", -10.0, 10.0, 0.0, 0.5)
         x = np.linspace(-10, 10, 400); y = a*x*x+b*x+c
         fig, ax = plt.subplots(); ax.plot(x,y); ax.axhline(0, linewidth=.8); ax.axvline(0, linewidth=.8); ax.grid(True, alpha=.25)
-        ax.set_title(f"f(x) = {a:g}x² + {b:g}x + {c:g}"); st.pyplot(fig, use_container_width=True)
-    elif experiment == "İkinci derece denklem":
-        c1,c2,c3 = st.columns(3); aa=c1.number_input("a katsayısı", value=1.0); bb=c2.number_input("b katsayısı", value=-3.0); cc=c3.number_input("c katsayısı", value=2.0)
-        if abs(aa) < 1e-12: st.warning("a sıfır olamaz; bu durumda denklem ikinci derece değildir.")
-        else:
-            delta=bb*bb-4*aa*cc; st.metric("Diskriminant Δ", f"{delta:.4g}")
-            if delta > 0: st.success(f"Kökler: {(-bb+math.sqrt(delta))/(2*aa):.5g} ve {(-bb-math.sqrt(delta))/(2*aa):.5g}")
-            elif abs(delta) < 1e-12: st.success(f"Çakışık kök: {-bb/(2*aa):.5g}")
-            else: st.info("Gerçek kök yok; iki karmaşık kök vardır.")
-    elif experiment == "Atış hareketi":
-        speed=st.slider("İlk hız (m/s)", 5, 50, 25); angle=st.slider("Açı (derece)", 5, 85, 45); theta=math.radians(angle); g=9.81; total=2*speed*math.sin(theta)/g
-        t=np.linspace(0,total,300); x=speed*math.cos(theta)*t; y=speed*math.sin(theta)*t-.5*g*t*t
-        fig,ax=plt.subplots(); ax.plot(x,y); ax.set_xlabel("Mesafe (m)"); ax.set_ylabel("Yükseklik (m)"); ax.grid(True,alpha=.25); ax.set_title("İdeal yörünge (hava direnci yok)"); st.pyplot(fig,use_container_width=True)
-        st.metric("İdeal menzil", f"{speed**2*math.sin(2*theta)/g:.2f} m")
-    elif experiment == "Dairesel hareket":
-        radius=st.slider("Yarıçap (m)",1,20,5); period=st.slider("Periyot (s)",1,30,8); time=st.slider("Zaman (s)",0.0,float(period),2.0,.1); ang=np.linspace(0,2*np.pi,300); pos=2*np.pi*time/period
-        fig,ax=plt.subplots(); ax.plot(radius*np.cos(ang),radius*np.sin(ang)); ax.scatter([radius*math.cos(pos)],[radius*math.sin(pos)]); ax.set_aspect("equal"); ax.grid(True,alpha=.25); st.pyplot(fig,use_container_width=True)
-        st.write(f"Açısal hız: **{2*math.pi/period:.3f} rad/s** · Çizgisel hız: **{2*math.pi*radius/period:.3f} m/s**")
-    else:
-        amp=st.slider("Genlik",.1,5.0,1.5,.1); freq=st.slider("Frekans parametresi",.1,3.0,1.0,.1); phase=st.slider("Faz",0.0,6.28,0.0,.1); x=np.linspace(0,4*np.pi,500); y=amp*np.sin(freq*x+phase)
-        fig,ax=plt.subplots(); ax.plot(x,y); ax.set_title("y = A sin(kx + φ)"); ax.grid(True,alpha=.25); st.pyplot(fig,use_container_width=True)
-
-elif selected_module == "🎬 Video Studio":
-    st.subheader("🎬 Lidya Motion Studio")
-    st.write("Konseptini senaryoya, sahne planına ve üretim istemlerine dönüştür.")
-    st.info("Lidya sahne görselleri üretip bunları MP4 slayt videosuna dönüştürebilir. Bu, hareket üreten bir text-to-video modeli değildir; sahne görselleri arasında geçiş yerine sabit kareler kullanır.")
-    with st.form("video_pack_form"):
-        concept=st.text_area("Video fikri", placeholder="Örn. hücrenin içinde bilimsel açıdan tutarlı sinematik bir yolculuk…", height=110)
-        c1,c2,c3=st.columns(3)
-        duration=c1.selectbox("Süre",["15 saniye","30 saniye","60 saniye","90 saniye","2 dakika"])
-        aspect=c2.selectbox("Kadraj",["16:9 sinematik","9:16 dikey","1:1 kare"])
-        style=c3.selectbox("Görsel tarz",["Bilimsel sinema","Belgesel","Animasyon","Minimal ve şiirsel","Fütüristik","Eğitici kısa video"])
-        audience=st.text_input("Hedef izleyici",value="Meraklı öğrenciler ve genel izleyici")
-        make_pack=st.form_submit_button("✨ Yapım paketini oluştur",use_container_width=True)
-    if make_pack:
-        if not concept.strip(): st.warning("Önce video fikrini yaz.")
-        elif client is None: st.error(ui["no_key"])
-        else:
-            request=f"Türkçe ve profesyonel bir video yapım paketi oluştur. Fikir: {concept}. Süre: {duration}. Kadraj: {aspect}. Stil: {style}. Hedef kitle: {audience}. Şunları ver: 1) başlık ve logline, 2) yaratıcı yaklaşım, 3) zaman kodlu sahne sahne storyboard (görüntü, kamera, ses, ekrandaki yazı), 4) anlatıcı metni, 5) renk/ışık/ses tasarımı, 6) her sahne için İngilizce video üretim promptu, 7) negative prompt, 8) montaj ve erişilebilirlik kontrol listesi, 9) bilimsel içerikse doğrulama maddeleri. Gerçek video dosyası ürettiğini iddia etme."
-            try:
-                with st.spinner("Lidya yapım paketini hazırlıyor…"):
-                    res=client.chat.completions.create(model=MODEL_NAME,messages=[{"role":"system","content":"You are a highly skilled creative director, storyboard artist and educational video producer. Be specific, original and practical."},{"role":"user","content":request}],temperature=.7,max_completion_tokens=3200)
-                st.session_state.video_pack=res.choices[0].message.content or ""
-            except Exception as exc: st.error(f"Paket hazırlanamadı: {type(exc).__name__}. Model erişimini ve kotayı kontrol et.")
-    if st.session_state.video_pack:
-        st.markdown("### 🎞️ Üretim paketi"); st.markdown(st.session_state.video_pack)
-        st.download_button("Paketi TXT olarak indir",st.session_state.video_pack,file_name="lidya_video_pack.txt",mime="text/plain")
-    st.markdown("### 🎥 MP4 video oluştur")
-    st.caption("Bu işlem sahne başına bir görsel üretir ve bunları kısa bir MP4 slayt videosuna dönüştürür. Görsel servisi yoğun olduğunda işlem başarısız olabilir.")
-    video_topic = st.text_input("Video için sahne konusu", key="video_topic", placeholder="Örn. hücrenin içindeki mitokondri yolculuğu")
-    scene_count = st.slider("Sahne sayısı", 2, 5, 3, key="video_scene_count")
-    if st.button("✨ Sahne görsellerini üret ve MP4 oluştur", use_container_width=True):
-        if not video_topic.strip():
-            st.warning("Önce video konusunu yaz.")
-        else:
             generated, captions = [], []
             progress = st.progress(0)
             status = st.empty()
@@ -1059,95 +921,6 @@ elif selected_module == "🎬 Video Studio":
             except Exception as exc:
                 st.error(f"Video oluşturulamadı: {type(exc).__name__}: {exc}")
                 st.info("Görsel servisi geçici olarak kullanılamıyor olabilir. Birkaç dakika sonra yeniden deneyebilirsin.")
-            finally:
-                progress.empty()
-                status.empty()
-
-elif selected_module in ("🎨 Image Studio",):
-    st.subheader("🎨 Görsel Atölyesi")
-    st.write("İstem hazırla veya doğrudan görsel üretmeyi dene.")
-    st.caption("Görsel üretimi harici bir çevrimiçi servise bağlıdır; servis kullanılabilirliği ve kullanım koşulları değişebilir.")
-    with st.form("image_generation_form"):
-        direct_idea = st.text_area("Görsel açıklaması", placeholder="Örn. bilimsel açıdan doğru, etiketli olmayan insan kalbi anatomisi illüstrasyonu", height=100, key="direct_image_idea")
-        direct_style = st.selectbox("Görsel tarzı", ["Bilimsel illüstrasyon", "Fotogerçekçi", "Dijital sanat", "Editoryal", "3D render", "Minimalist"], key="direct_image_style")
-        direct_ratio = st.selectbox("En-boy oranı", ["1:1", "4:5", "16:9", "9:16"], key="direct_image_ratio")
-        make_image = st.form_submit_button("🪄 Görseli oluştur", use_container_width=True)
-    if make_image:
-        if not direct_idea.strip():
-            st.warning("Önce görsel açıklamasını yaz.")
-        else:
-            sizes = {"1:1": (1024,1024), "4:5": (832,1040), "16:9": (1024,576), "9:16": (576,1024)}
-            w,h = sizes[direct_ratio]
-            with st.spinner("Görsel üretiliyor… bu işlem bir dakika veya daha uzun sürebilir."):
-                try:
-                    img_bytes = generate_image_bytes(f"{direct_idea}. Style: {direct_style}. High quality, carefully composed, no watermark.", w, h)
-                    st.image(img_bytes, caption="Lidya AI tarafından oluşturulan görsel", use_container_width=True)
-                    st.download_button("⬇️ Görseli PNG olarak indir", img_bytes, file_name="lidya_ai_image.png", mime="image/png")
-                except Exception as exc:
-                    st.error(f"Görsel üretilemedi: {type(exc).__name__}: {exc}")
-                    st.info("Görsel servisi geçici olarak kullanılamıyor olabilir; yeniden deneyebilirsin.")
-
-else:
-    st.subheader(MODULE_LABELS.get(language, {}).get(selected_module, selected_module))
-    st.caption(MODULES[selected_module][1])
-    if selected_module == "📁 File Laboratory": st.info(ui["file_note"])
-    if selected_module == "🩺 Medical & Anatomy": st.info("Eğitim amaçlıdır; tanı veya tedavi kararlarının yerini tutmaz.")
-    if selected_module == "🔬 Science & Research": st.caption("Canlı arama açıksa kaynak sonuçları yanıtla birlikte kullanılabilir.")
-    if selected_module == "🎓 University & Admissions":
-        st.info("Üniversite araştırması, kabul koşulları, burs ve maddi yardım, başvuru takvimi, essay düzenleme ve profesörlere ulaşma için kullan. Güncel bilgi için sol menüden canlı web aramasını aç; mümkün olduğunda üniversitelerin resmî sitelerini esas al.")
-
-# ======================================================
-# 9. CHAT HISTORY (separate per workspace)
-# ======================================================
-if selected_module in MODULES and selected_module not in ("🎬 Video Studio",):
-    active_chat = current_chat(selected_module)
-    if st.session_state.get("smart_assistant_mode", True):
-        st.markdown("<div class='lab-banner'>💜 <b>Lidya Akıllı Asistan Modu</b> · bağlamı takip eder · analiz eder · sonraki adımı belirler</div>", unsafe_allow_html=True)
-    st.markdown(f"#### 💬 {active_chat['name']}")
-    messages = get_messages(selected_module)
-    if messages:
-        st.download_button(
-            "📥 Bu sohbeti indir",
-            data=json.dumps({"module": selected_module, "chat": active_chat}, ensure_ascii=False, indent=2),
-            file_name=f"lidya_chat_{selected_module.split(' ')[-1].replace('/', '-')}.json",
-            mime="application/json",
-            key=f"download_chat_{selected_module}",
-        )
-    if not messages:
-        with st.chat_message("assistant", avatar="💜"):
-            st.markdown(ui["welcome"])
-    for message in messages:
-        with st.chat_message(message["role"], avatar="💜" if message["role"] == "assistant" else "🧑‍💻"):
-            st.markdown(message["content"])
-            if message.get("time"):
-                st.caption(message["time"])
-    if st.session_state.get("last_web_sources") and st.session_state.get("web_search_enabled", False):
-        with st.expander("🌐 Kullanılan web sonuçları"):
-            for source in st.session_state.last_web_sources:
-                st.markdown(f"**[{source['title']}]({source['url']})**  \n{source['body']}")
-
-# ======================================================
-# 10. CHAT WITH FILE ATTACHMENTS
-# ======================================================
-if selected_module in MODULES and selected_module not in ("🎬 Video Studio", "🎨 Image Studio"):
-    with st.expander("🎙️ Hey Lidya — sesle konuş", expanded=False):
-        st.caption("Mikrofon düğmesine dokunup konuşmanı kaydet. Bu, sürekli arka planda dinleme yapmaz; mikrofon yalnızca sen kaydı başlattığında kullanılır.")
-        audio_message = st.audio_input("Hey Lidya, konuşmak için kaydet")
-        if audio_message is not None:
-            audio_hash = hashlib.sha256(audio_message.getvalue()).hexdigest()
-            if audio_hash != st.session_state.last_voice_hash:
-                if client is None:
-                    st.error(ui["no_key"])
-                else:
-                    try:
-                        with st.spinner("Lidya sesini yazıya dönüştürüyor…"):
-                            spoken_text = transcribe_audio(audio_message)
-                        st.session_state.last_voice_hash = audio_hash
-                        spoken_text = str(spoken_text).strip()
-                        if spoken_text:
-                            active_messages = get_messages(selected_module)
-                            history = list(active_messages)
-                            api_messages = [{"role":"system","content":build_system_instruction(selected_module,language)}]
                             for item in history[-8:]:
                                 if item.get("role") in ("user","assistant"):
                                     api_messages.append({"role":item["role"],"content":item["content"][:9000]})
@@ -1168,56 +941,6 @@ if selected_module in MODULES and selected_module not in ("🎬 Video Studio", "
 if selected_module in MODULES and selected_module not in ("🎬 Video Studio",):
     uploaded_chat = st.chat_input(
         ui["chat"],
-        accept_file="multiple",
-        file_type=["pdf","docx","txt","md","csv","json","py","png","jpg","jpeg","webp"],
-    )
-    if uploaded_chat:
-        prompt_text = (uploaded_chat.text or "").strip()
-        extracted = []
-        names = []
-        for file in uploaded_chat.files:
-            names.append(file.name)
-            extracted.append(f"\n\n[Dosya: {file.name}]\n{extract_file(file)}")
-        full_prompt = prompt_text + ("\n\nEkli dosyaların içeriği:\n" + "\n".join(extracted) if extracted else "")
-        web_context = ""
-        web_results = []
-        if web_search_enabled and prompt_text.strip():
-            with st.spinner("Canlı web sonuçları aranıyor…"):
-                web_results, search_error = search_web(prompt_text, max_results=5)
-            if web_results:
-                web_context = "\n\nLIVE WEB SEARCH RESULTS (treat as sources to assess, not guaranteed truth):\n" + "\n".join(
-                    f"{i+1}. {item['title']}\nURL: {item['url']}\nSnippet: {item['body']}" for i, item in enumerate(web_results)
-                )
-                full_prompt += web_context
-            elif search_error:
-                st.warning("Canlı arama şu anda çalışmadı; yanıt web kaynakları olmadan hazırlanacak.")
-        if not full_prompt.strip():
-            st.warning("Bir mesaj yaz veya dosya ekle.")
-        elif client is None:
-            st.error(ui["no_key"])
-        else:
-            messages = get_messages(selected_module)
-            history = list(messages)
-            user_display = prompt_text or "Ekli dosyayı incele."
-            if names: user_display += "\n\n📎 " + ", ".join(names)
-            messages.append({"role":"user","content":user_display,"time":turkish_time()})
-            api_messages=[{"role":"system","content":build_system_instruction(selected_module,language)}]
-            for item in history[-8:]:
-                if item.get("role") in ("user","assistant"):
-                    api_messages.append({"role":item["role"],"content":item["content"][:9000]})
-            api_messages.append({"role":"user","content":full_prompt[:18000]})
-            try:
-                with st.spinner(ui["thinking"]):
-                    completion=client.chat.completions.create(model=MODEL_NAME,messages=api_messages,temperature=.4,max_completion_tokens=2200)
-                answer=completion.choices[0].message.content
-                if not answer: raise RuntimeError("Model boş yanıt döndürdü.")
-                messages.append({"role":"assistant","content":answer,"time":turkish_time()})
-                st.session_state.last_answer=answer
-                if web_results:
-                    st.session_state.last_web_sources = web_results
-                st.rerun()
-            except Exception as exc:
-                st.error(ui["error"])
                 st.caption(f"{type(exc).__name__}: {exc}")
 
 # ======================================================
@@ -1239,13 +962,19 @@ if selected_module == "🎨 Image Studio":
             except Exception as exc: st.error(f"Prompt hazırlanamadı: {type(exc).__name__}")
 
 # ======================================================
-# 11. TEXT-TO-SPEECH
-# ======================================================
-voice_output = st.session_state.get("voice_output", False)
-if voice_output and st.session_state.last_answer:
-    speech_language = {"Türkçe":"tr-TR","English":"en-US","Français":"fr-FR","Deutsch":"de-DE","Español":"es-ES","Italiano":"it-IT","日本語":"ja-JP","العربية":"ar-SA"}[language]
-    safe_text = json.dumps(st.session_state.last_answer, ensure_ascii=False)
-    components.html(f"""<script>const text={safe_text};const utterance=new SpeechSynthesisUtterance(text);utterance.lang=\"{speech_language}\";utterance.rate={float(st.session_state.get("voice_rate", 1.0))};window.speechSynthesis.cancel();window.speechSynthesis.speak(utterance);</script>""",height=0)
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    }
+    if (window.speechSynthesis.getVoices().length) { speak(); }
+    else { window.speechSynthesis.onvoiceschanged = speak; }
+    </script>"""
+    tts_script = (tts_script
+                  .replace("__TEXT__", safe_text)
+                  .replace("__LANG2__", speech_language[:2])
+                  .replace("__LANG__", speech_language)
+                  .replace("__RATE__", str(float(st.session_state.get("voice_rate", 1.0))))
+                  .replace("__PITCH__", str(float(st.session_state.get("voice_pitch", 1.0)))))
+    components.html(tts_script, height=0)
 
 # ======================================================
 # 12. FOOTER
