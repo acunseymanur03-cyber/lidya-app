@@ -6,6 +6,7 @@ import re
 import time
 import uuid
 import hashlib
+import hmac
 import urllib.parse
 import requests
 from PIL import Image, ImageDraw, ImageFont
@@ -70,8 +71,6 @@ MODULES = {
     "📈 Data Analysis": ("Data Analysis", "Help interpret data and explain analysis methods."),
     "🔐 Cybersecurity": ("Cybersecurity", "Focus on defensive security, privacy and secure coding."),
     "🏠 Smart Devices": ("Smart Devices", "Plan safe smart-home integrations; do not claim to control devices."),
-    "🎨 Image Studio": ("Image Studio", "Generate images and create detailed visual prompts."),
-    "🎬 Video Studio": ("Video Studio", "Generate a short storyboard-style MP4 from AI-generated scene images, plus a production pack."),
     "⚡ Quick Analysis": ("Quick Analysis", "Fast situation breakdown: what is happening, risk level, best next action."),
     "📍 Location Helper": ("Location Helper", "Help with places, directions and sharing a location with trusted contacts, using only a location the user provides or shares. Never track anyone."),
     "🩹 Symptom Organizer": ("Symptom Organizer", "Organize symptoms and explain possibilities cautiously. No diagnosis; give urgent-care guidance when needed."),
@@ -438,13 +437,117 @@ Help with university discovery, admissions planning, scholarships, financial aid
 # ======================================================
 # 6. SESSION STATE + FILE UTILITIES
 # ======================================================
+# ======================================================
+# 5b. GİRİŞ KODU + KALICI HAFIZA (Supabase)
+# ======================================================
+def get_secret(name, default=""):
+    try:
+        v = st.secrets.get(name, "")
+        if v:
+            return str(v)
+    except Exception:
+        pass
+    return os.environ.get(name, default)
+
+
+SUPABASE_URL = get_secret("SUPABASE_URL").rstrip("/")
+SUPABASE_KEY = get_secret("SUPABASE_KEY")
+APP_PIN = get_secret("APP_PIN")
+CLOUD_ON = bool(SUPABASE_URL and SUPABASE_KEY and APP_PIN)
+
+
+def _sb_headers(extra=None):
+    h = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Content-Type": "application/json"}
+    if extra:
+        h.update(extra)
+    return h
+
+
+def cloud_load(user_key):
+    r = requests.get(f"{SUPABASE_URL}/rest/v1/lidya_store",
+                     params={"user_key": f"eq.{user_key}", "select": "data"}, headers=_sb_headers(), timeout=15)
+    r.raise_for_status()
+    rows = r.json()
+    return rows[0]["data"] if rows else None
+
+
+def cloud_save(user_key, data):
+    body = json.dumps({"user_key": user_key, "data": data, "updated_at": datetime.now(ZoneInfo("UTC")).isoformat()}, ensure_ascii=False)
+    r = requests.post(f"{SUPABASE_URL}/rest/v1/lidya_store", params={"on_conflict": "user_key"},
+                      headers=_sb_headers({"Prefer": "resolution=merge-duplicates,return=minimal"}),
+                      data=body.encode("utf-8"), timeout=20)
+    r.raise_for_status()
+
+
+def _clean_chats(raw):
+    out = {}
+    if not isinstance(raw, dict):
+        return out
+    for module_name, chat_list in raw.items():
+        if module_name not in MODULES or not isinstance(chat_list, list):
+            continue
+        cleaned = []
+        for chat_item in chat_list[:100]:
+            if not isinstance(chat_item, dict) or not isinstance(chat_item.get("messages", []), list):
+                continue
+            msgs = []
+            for msg in chat_item.get("messages", [])[-500:]:
+                if isinstance(msg, dict) and msg.get("role") in ("user", "assistant") and isinstance(msg.get("content", ""), str):
+                    item = {"role": msg["role"], "content": msg["content"][:18000], "time": str(msg.get("time", ""))[:40]}
+                    if msg.get("media_id"):
+                        item["media_id"] = str(msg["media_id"])[:20]
+                    msgs.append(item)
+            cleaned.append({"id": str(chat_item.get("id", uuid.uuid4().hex[:10]))[:40],
+                            "name": str(chat_item.get("name", "Yeni sohbet"))[:100], "messages": msgs})
+        out[module_name] = cleaned
+    return out
+
+
+if APP_PIN and not st.session_state.get("authed"):
+    st.markdown('<div class="lidya-title">LIDYA AI</div>', unsafe_allow_html=True)
+    st.markdown('<div class="lidya-subtitle">Giriş kodunu yaz</div>', unsafe_allow_html=True)
+    with st.form("pin_form"):
+        pin_try = st.text_input("🔐 Giriş kodu", type="password")
+        pin_ok = st.form_submit_button("Giriş", use_container_width=True)
+    if pin_ok:
+        if hmac.compare_digest(pin_try.encode("utf-8"), APP_PIN.encode("utf-8")):
+            st.session_state.authed = True
+            st.rerun()
+        else:
+            st.error("Kod yanlış.")
+    st.stop()
+
+USER_KEY = hashlib.sha256(("lidya:" + APP_PIN).encode("utf-8")).hexdigest()[:32] if APP_PIN else "local"
+st.session_state.setdefault("media", {})
+st.session_state.setdefault("plus_nonce", 0)
+
+if CLOUD_ON and not st.session_state.get("_cloud_loaded"):
+    try:
+        _data = cloud_load(USER_KEY)
+        if isinstance(_data, dict):
+            st.session_state.chats_by_module = _clean_chats(_data.get("chats_by_module", {}))
+            _cur = _data.get("current_chat_by_module", {})
+            st.session_state.current_chat_by_module = {k: str(v) for k, v in _cur.items() if k in MODULES} if isinstance(_cur, dict) else {}
+            if isinstance(_data.get("notes"), str):
+                st.session_state.lidya_memory_notes = _data["notes"][:4000]
+            if isinstance(_data.get("settings"), dict):
+                st.session_state._saved_settings = _data["settings"]
+            if isinstance(_data.get("contacts"), list):
+                st.session_state.emergency_contacts = [c for c in _data["contacts"] if isinstance(c, dict)][:50]
+            st.session_state._last_saved_hash = hashlib.sha256(json.dumps(_data, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+        st.session_state._cloud_status = "ok"
+    except Exception as exc:
+        st.session_state._cloud_status = f"{type(exc).__name__}"
+    st.session_state._cloud_loaded = True
+
 # ---- Ayarların sayfalar arası kaybolmaması için kaydet/geri yükle ----
 PERSIST_KEYS = ["theme_choice", "response_style", "response_length", "interaction_mode",
-                "lidya_personality", "proactive_mode", "voice_rate", "voice_pitch", "lidya_memory_notes"]
+                "lidya_personality", "proactive_mode", "voice_rate", "voice_pitch", "lidya_memory_notes", "auto_memory"]
 _saved_settings = st.session_state.setdefault("_saved_settings", {})
 for _k in PERSIST_KEYS:
     if _k not in st.session_state and _k in _saved_settings:
         st.session_state[_k] = _saved_settings[_k]
+st.session_state.setdefault("auto_memory", True)
 
 if "chats_by_module" not in st.session_state:
     st.session_state.chats_by_module = {}
@@ -553,18 +656,28 @@ def search_web(query, max_results=5):
 
 
 def generate_image_bytes(prompt, width=1024, height=1024, seed=None):
-    """Generate an image using the public Pollinations image endpoint (availability may vary)."""
-    safe_prompt = urllib.parse.quote(prompt[:1800], safe="")
-    params = {"width": width, "height": height, "nologo": "true", "model": "flux"}
-    if seed is not None:
-        params["seed"] = int(seed)
+    """Generate an image via Pollinations with retries and model fallback (free service; may be busy)."""
+    clean = re.sub(r"\s+", " ", prompt or "").strip()[:500]
+    safe_prompt = urllib.parse.quote(clean, safe="")
     url = f"https://image.pollinations.ai/prompt/{safe_prompt}"
-    response = requests.get(url, params=params, timeout=120, headers={"User-Agent": "LidyaAI/1.0"})
-    response.raise_for_status()
-    image = Image.open(io.BytesIO(response.content)).convert("RGB")
-    output = io.BytesIO()
-    image.save(output, format="PNG")
-    return output.getvalue()
+    last_error = "bilinmeyen hata"
+    for attempt, model in enumerate(["flux", "turbo", "flux", "turbo"]):
+        params = {"width": width, "height": height, "nologo": "true", "model": model}
+        if seed is not None:
+            params["seed"] = int(seed) + attempt
+        try:
+            response = requests.get(url, params=params, timeout=50, headers={"User-Agent": "LidyaAI/1.0"})
+            ctype = response.headers.get("content-type", "")
+            if response.status_code == 200 and ctype.startswith("image/") and len(response.content) > 2000:
+                image = Image.open(io.BytesIO(response.content)).convert("RGB")
+                output = io.BytesIO()
+                image.save(output, format="PNG")
+                return output.getvalue()
+            last_error = f"HTTP {response.status_code}"
+        except Exception as exc:
+            last_error = type(exc).__name__
+        time.sleep(2 + attempt * 2)
+    raise RuntimeError(f"Görsel servisi yanıt vermedi ({last_error})")
 
 
 def fit_frame(image_bytes, width=960, height=540, caption=""):
@@ -615,12 +728,16 @@ def geocode_place(query):
 
 
 def quick_llm(system_text, user_text, max_tokens=900):
-    res = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[{"role": "system", "content": system_text}, {"role": "user", "content": user_text}],
-        temperature=0.3,
-        max_completion_tokens=max_tokens,
-    )
+    messages = [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
+    try:
+        res = client.chat.completions.create(
+            model=MODEL_NAME, messages=messages, temperature=0.3,
+            max_completion_tokens=max_tokens, reasoning_effort="low",
+        )
+    except Exception:
+        res = client.chat.completions.create(
+            model=MODEL_NAME, messages=messages, temperature=0.3, max_completion_tokens=max_tokens,
+        )
     return res.choices[0].message.content or ""
 
 
@@ -630,6 +747,168 @@ def clean_phone(phone):
 
 def wa_number(phone):
     return re.sub(r"\D", "", phone or "")
+
+
+TR_ASCII = str.maketrans("çğıöşüÇĞİÖŞÜâîû", "cgiosuCGIOSUaiu")
+
+
+def ascii_tr(text):
+    return (text or "").translate(TR_ASCII).encode("ascii", "ignore").decode("ascii")
+
+
+class _Submission:
+    def __init__(self, text, files):
+        self.text = text
+        self.files = files
+
+
+def delete_chat(module, chat_id):
+    chats = st.session_state.chats_by_module.get(module, [])
+    remaining = [c for c in chats if c["id"] != chat_id]
+    st.session_state.chats_by_module[module] = remaining
+    if remaining:
+        st.session_state.current_chat_by_module[module] = remaining[-1]["id"]
+    else:
+        st.session_state.current_chat_by_module.pop(module, None)
+    st.session_state.last_answer = ""
+
+
+def auto_title(chat, text):
+    """Give a new chat a short title taken from the first message."""
+    if chat.get("name") not in ("Yeni sohbet", "", None) or not (text or "").strip():
+        return
+    title = ""
+    if client is not None:
+        try:
+            title = quick_llm(
+                "Write a very short chat title (max 5 words) in the same language as the message. Output only the title, no quotes.",
+                text[:400], 200,
+            ).strip().strip("\"'")
+        except Exception:
+            title = ""
+    if not title or len(title) > 60:
+        title = re.sub(r"\s+", " ", text).strip()[:40]
+    chat["name"] = title[:60]
+
+
+def auto_memory_update(user_text):
+    """Save durable, non-sensitive facts the user stated about themselves into the profile notes."""
+    if not st.session_state.get("auto_memory", True) or client is None:
+        return
+    if len((user_text or "").strip()) < 12:
+        return
+    try:
+        out = quick_llm(
+            "Extract durable facts or preferences the user EXPLICITLY stated about themselves (name, preferred language, "
+            "projects, goals, interests, routines, communication preferences). Exclude: health, finances, passwords, ID or phone "
+            "numbers, exact addresses, secrets, guesses, and private details about other people. Write at most 3 short Turkish "
+            "bullets, each starting with '- '. If there is nothing worth remembering, output exactly NONE.",
+            user_text[:1500], 400,
+        )
+    except Exception:
+        return
+    lines = [l.strip()[:200] for l in out.splitlines() if l.strip().startswith("- ")][:3]
+    notes = st.session_state.get("lidya_memory_notes", "")
+    fresh = [l for l in lines if l.lower() not in notes.lower()]
+    if fresh:
+        st.session_state.lidya_memory_notes = (notes.strip() + "\n" + "\n".join(fresh)).strip()[-4000:]
+
+
+def make_english_prompt(idea, style):
+    base = f"{(idea or '').strip()[:400]}. Style: {style}. High quality, carefully composed, no watermark."
+    if client is None:
+        return base
+    try:
+        out = quick_llm(
+            "You write concise image-generation prompts. Translate and enrich the user's idea into ONE English prompt, "
+            "max 70 words: subject, composition, lighting, style. Keep any text that must appear in the image exactly as the "
+            "user quoted it. Output only the prompt.",
+            f"Idea: {idea[:600]}\nStyle: {style}", 400,
+        ).strip().strip("\"")
+        return out[:500] if out else base
+    except Exception:
+        return base
+
+
+def _add_media_turn(module, user_text, answer_text, kind, data, title_hint):
+    mid = uuid.uuid4().hex[:10]
+    st.session_state.media[mid] = {"kind": kind, "data": data}
+    chat = current_chat(module)
+    chat["messages"].append({"role": "user", "content": user_text, "time": turkish_time()})
+    chat["messages"].append({"role": "assistant", "content": answer_text, "time": turkish_time(), "media_id": mid})
+    if chat.get("name") in ("Yeni sohbet", "", None):
+        chat["name"] = re.sub(r"\s+", " ", title_hint).strip()[:40] or "Yeni sohbet"
+
+
+def _do_image(module, idea, style, ratio):
+    if not idea.strip():
+        st.warning("Önce ne çizmemi istediğini yaz.")
+        return
+    sizes = {"1:1": (1024, 1024), "4:5": (832, 1040), "16:9": (1024, 576), "9:16": (576, 1024)}
+    w, h = sizes.get(ratio, (1024, 1024))
+    with st.spinner("Görsel hazırlanıyor… ücretsiz servis yavaş olabilir, bir dakika sürebilir."):
+        try:
+            data = generate_image_bytes(make_english_prompt(idea, style), w, h)
+        except Exception as exc:
+            st.error(f"Görsel üretilemedi: {exc}. Servis yoğun olabilir; biraz sonra tekrar dene.")
+            return
+    _add_media_turn(module, f"🖼️ Görsel isteği: {idea.strip()[:300]}", "İşte görselin! 💜", "image", data, "Görsel: " + idea)
+    st.rerun()
+
+
+def _do_video(module, topic, style, scenes):
+    if not topic.strip():
+        st.warning("Önce video konusunu yaz.")
+        return
+    prog = st.progress(0.0, text="Sahneler hazırlanıyor…")
+    imgs, caps = [], []
+    try:
+        for i in range(scenes):
+            prog.progress(i / (scenes + 1), text=f"Sahne {i+1}/{scenes} görseli hazırlanıyor…")
+            p = make_english_prompt(
+                f"Scene {i+1} of {scenes} of one coherent short video about: {topic}. A distinct stage of the story, consistent look, no text.",
+                style,
+            )
+            imgs.append(generate_image_bytes(p, 1024, 576, seed=i + 21))
+            caps.append(f"{ascii_tr(topic)[:60]} - {i+1}")
+        prog.progress(scenes / (scenes + 1), text="MP4 hazırlanıyor…")
+        mp4 = create_slideshow_video(imgs, caps, seconds_per_scene=2, fps=12)
+    except Exception as exc:
+        prog.empty()
+        st.error(f"Video oluşturulamadı: {exc}. Servis yoğun olabilir; biraz sonra tekrar dene.")
+        return
+    prog.empty()
+    _add_media_turn(module, f"🎬 Video isteği: {topic.strip()[:300]}",
+                    "Videon hazır! Not: sahne görsellerinden oluşan kısa bir slayt videosu, hareketli yapay zekâ videosu değil. 💜",
+                    "video", mp4, "Video: " + topic)
+    st.rerun()
+
+
+def render_plus_menu(module):
+    nonce = st.session_state.plus_nonce
+    n_files = len(st.session_state.get(f"plus_files_{nonce}") or [])
+    label = "➕ Ekle" + (f"  ·  📎 {n_files}" if n_files else "")
+    with st.popover(label):
+        tab_file, tab_img, tab_vid = st.tabs(["📎 Dosya", "🖼️ Görsel", "🎬 Video"])
+        with tab_file:
+            st.caption("PDF, DOCX, TXT, MD, CSV, JSON veya PY. Bir sonraki mesajınla birlikte gider.")
+            st.file_uploader("Dosya seç", type=["pdf", "docx", "txt", "md", "csv", "json", "py"],
+                             accept_multiple_files=True, key=f"plus_files_{nonce}", label_visibility="collapsed")
+        with tab_img:
+            idea = st.text_area("Ne çizeyim?", key="plus_img_idea", height=90, placeholder="Kısa ve net yaz. Örn: gün batımında bir deniz feneri")
+            c1, c2 = st.columns(2)
+            style = c1.selectbox("Tarz", ["3D render", "Bilimsel illüstrasyon", "Fotogerçekçi", "Dijital sanat", "Editoryal", "Minimalist"], key="plus_img_style")
+            ratio = c2.selectbox("Oran", ["1:1", "4:5", "16:9", "9:16"], key="plus_img_ratio")
+            if st.button("🪄 Görsel oluştur", key="plus_img_go", use_container_width=True):
+                _do_image(module, idea, style, ratio)
+        with tab_vid:
+            topic = st.text_area("Video konusu", key="plus_vid_topic", height=90, placeholder="Örn: hücrenin içindeki mitokondri yolculuğu")
+            c1, c2 = st.columns(2)
+            vstyle = c1.selectbox("Tarz", ["Bilimsel sinema", "Belgesel", "Animasyon", "Minimal ve şiirsel", "Fütüristik"], key="plus_vid_style")
+            scenes = c2.slider("Sahne", 2, 4, 3, key="plus_vid_scenes")
+            st.caption("Sahne görselleri üretilip kısa bir MP4 slayt videosu yapılır. Servis yoğunsa başarısız olabilir.")
+            if st.button("🎬 Video oluştur", key="plus_vid_go", use_container_width=True):
+                _do_video(module, topic, vstyle, scenes)
 
 
 def render_hey_lidya_listener(enabled, language_name):
@@ -716,6 +995,9 @@ with st.sidebar:
     hey_lidya_on = st.checkbox("🎙️ “Hey Lidya” dinleme (bu sekme açıkken)", value=False, key="hey_lidya_on",
                                help="Tarayıcı mikrofon izni ister. Örn: “Hey Lidya, bugün ne çalışsam?” de. Chrome, Edge ve Safari'de çalışır; sekme açıkken dinler.")
 
+    st.checkbox("🧠 Otomatik hafıza", key="auto_memory",
+                help="Lidya, kendin hakkında açıkça söylediğin kalıcı bilgileri (tercihler, hedefler) hafızaya ekler. Ayarlar'dan görüp silebilirsin.")
+
     if selected_module in MODULES:
         active = ensure_chat(selected_module)
         st.markdown("### 💬 Sohbetler")
@@ -746,9 +1028,24 @@ with st.sidebar:
             active["messages"] = []
             st.session_state.last_answer = ""
             st.rerun()
+        with st.popover("🗑️ Bu sohbeti tamamen sil", use_container_width=True):
+            st.write("Sohbet ve içindeki tüm mesajlar silinecek.")
+            if st.button("Evet, sil", key=f"del_chat_{selected_module}_{active['id']}", type="primary", use_container_width=True):
+                delete_chat(selected_module, active["id"])
+                st.rerun()
 
     st.divider()
-    st.caption("💜 Lidya AI · Hey Lidya sesli giriş aşağıda")
+    if CLOUD_ON:
+        if st.session_state.get("_cloud_status") == "ok":
+            st.caption("☁️ Kalıcı hafıza açık")
+        else:
+            st.warning(f"Kalıcı hafızaya bağlanılamadı ({st.session_state.get('_cloud_status')}). Bu oturumdaki değişiklikler kaydedilmez.")
+            if st.button("Yeniden dene", key="cloud_retry", use_container_width=True):
+                st.session_state._cloud_loaded = False
+                st.rerun()
+    else:
+        st.caption("💾 Kalıcı hafıza kapalı (Supabase ve APP_PIN ayarı yok)")
+    st.caption("💜 Lidya AI")
 
 # ======================================================
 # 8. HEADER + INTERACTIVE SIMULATION LABS
@@ -1186,6 +1483,7 @@ if selected_module == "⚙️ Ayarlar":
         placeholder="Örn. Tercih ettiğim dil Türkçe. Açıklamalar adım adım olsun. Üzerinde çalıştığım proje: ...",
         help="Parola, adres, kimlik numarası veya özel sağlık bilgisi gibi hassas bilgileri yazma.",
     )
+    st.button("🧹 Hafızayı temizle", key="clear_memory_notes", on_click=lambda: st.session_state.update(lidya_memory_notes=""))
     profile_payload = json.dumps({"version": 1, "profile_notes": st.session_state.lidya_memory_notes}, ensure_ascii=False, indent=2)
     st.download_button(
         "💾 Hafıza profilini indir",
@@ -1362,234 +1660,4 @@ elif selected_module == "🎬 Video Studio":
                     scene_prompt = (f"Create scene {idx+1} of {scene_count} for a coherent {style} video about {video_topic}. "
                                     f"Aspect ratio {aspect}. Keep visual continuity, clear composition, high quality, no text, no watermark. "
                                     f"This scene should show a distinct stage of the story.")
-                    generated.append(generate_image_bytes(scene_prompt, 1024, 576, seed=idx+21))
-                    captions.append(f"{video_topic} · Sahne {idx+1}")
-                    progress.progress((idx+1)/scene_count)
-                status.info("MP4 hazırlanıyor…")
-                mp4 = create_slideshow_video(generated, captions, seconds_per_scene=2, fps=12)
-                st.video(mp4)
-                st.download_button("⬇️ MP4 videoyu indir", mp4, file_name="lidya_ai_video.mp4", mime="video/mp4")
-                st.success("MP4 hazır. Not: Bu çıktı sahne görsellerinden oluşan bir slayt videosudur.")
-            except Exception as exc:
-                st.error(f"Video oluşturulamadı: {type(exc).__name__}: {exc}")
-                st.info("Görsel servisi geçici olarak kullanılamıyor olabilir. Birkaç dakika sonra yeniden deneyebilirsin.")
-            finally:
-                progress.empty()
-                status.empty()
-
-elif selected_module in ("🎨 Image Studio",):
-    st.subheader("🎨 Görsel Atölyesi")
-    st.write("İstem hazırla veya doğrudan görsel üretmeyi dene.")
-    st.caption("Görsel üretimi harici bir çevrimiçi servise bağlıdır; servis kullanılabilirliği ve kullanım koşulları değişebilir.")
-    with st.form("image_generation_form"):
-        direct_idea = st.text_area("Görsel açıklaması", placeholder="Örn. bilimsel açıdan doğru, etiketli olmayan insan kalbi anatomisi illüstrasyonu", height=100, key="direct_image_idea")
-        direct_style = st.selectbox("Görsel tarzı", ["Bilimsel illüstrasyon", "Fotogerçekçi", "Dijital sanat", "Editoryal", "3D render", "Minimalist"], key="direct_image_style")
-        direct_ratio = st.selectbox("En-boy oranı", ["1:1", "4:5", "16:9", "9:16"], key="direct_image_ratio")
-        make_image = st.form_submit_button("🪄 Görseli oluştur", use_container_width=True)
-    if make_image:
-        if not direct_idea.strip():
-            st.warning("Önce görsel açıklamasını yaz.")
-        else:
-            sizes = {"1:1": (1024,1024), "4:5": (832,1040), "16:9": (1024,576), "9:16": (576,1024)}
-            w,h = sizes[direct_ratio]
-            with st.spinner("Görsel üretiliyor… bu işlem bir dakika veya daha uzun sürebilir."):
-                try:
-                    img_bytes = generate_image_bytes(f"{direct_idea}. Style: {direct_style}. High quality, carefully composed, no watermark.", w, h)
-                    st.image(img_bytes, caption="Lidya AI tarafından oluşturulan görsel", use_container_width=True)
-                    st.download_button("⬇️ Görseli PNG olarak indir", img_bytes, file_name="lidya_ai_image.png", mime="image/png")
-                except Exception as exc:
-                    st.error(f"Görsel üretilemedi: {type(exc).__name__}: {exc}")
-                    st.info("Görsel servisi geçici olarak kullanılamıyor olabilir; yeniden deneyebilirsin.")
-
-else:
-    st.subheader(MODULE_LABELS.get(language, {}).get(selected_module, selected_module))
-    st.caption(MODULES[selected_module][1])
-    if selected_module == "📁 File Laboratory": st.info(ui["file_note"])
-    if selected_module == "🩺 Medical & Anatomy": st.info("Eğitim amaçlıdır; tanı veya tedavi kararlarının yerini tutmaz.")
-    if selected_module == "🔬 Science & Research": st.caption("Canlı arama açıksa kaynak sonuçları yanıtla birlikte kullanılabilir.")
-    if selected_module == "🎓 University & Admissions":
-        st.info("Üniversite araştırması, kabul koşulları, burs ve maddi yardım, başvuru takvimi, essay düzenleme ve profesörlere ulaşma için kullan. Güncel bilgi için sol menüden canlı web aramasını aç; mümkün olduğunda üniversitelerin resmî sitelerini esas al.")
-
-# ======================================================
-# 9. CHAT HISTORY (separate per workspace)
-# ======================================================
-if selected_module in MODULES and selected_module not in ("🎬 Video Studio",):
-    active_chat = current_chat(selected_module)
-    if st.session_state.get("smart_assistant_mode", True):
-        st.markdown("<div class='lab-banner'>💜 <b>Lidya Akıllı Asistan Modu</b> · bağlamı takip eder · analiz eder · sonraki adımı belirler</div>", unsafe_allow_html=True)
-    st.markdown(f"#### 💬 {active_chat['name']}")
-    messages = get_messages(selected_module)
-    if messages:
-        st.download_button(
-            "📥 Bu sohbeti indir",
-            data=json.dumps({"module": selected_module, "chat": active_chat}, ensure_ascii=False, indent=2),
-            file_name=f"lidya_chat_{selected_module.split(' ')[-1].replace('/', '-')}.json",
-            mime="application/json",
-            key=f"download_chat_{selected_module}",
-        )
-    if not messages:
-        with st.chat_message("assistant", avatar="💜"):
-            st.markdown(ui["welcome"])
-    for message in messages:
-        with st.chat_message(message["role"], avatar="💜" if message["role"] == "assistant" else "🧑‍💻"):
-            st.markdown(message["content"])
-            if message.get("time"):
-                st.caption(message["time"])
-    if st.session_state.get("last_web_sources") and st.session_state.get("web_search_enabled", False):
-        with st.expander("🌐 Kullanılan web sonuçları"):
-            for source in st.session_state.last_web_sources:
-                st.markdown(f"**[{source['title']}]({source['url']})**  \n{source['body']}")
-
-# ======================================================
-# 10. CHAT WITH FILE ATTACHMENTS
-# ======================================================
-if selected_module in MODULES and selected_module not in ("🎬 Video Studio", "🎨 Image Studio"):
-    with st.expander("🎙️ Hey Lidya — sesle konuş", expanded=False):
-        st.caption("Mikrofon düğmesine dokunup konuşmanı kaydet. Kaydetmeden, sürekli dinleme için kenar çubuğundaki “Hey Lidya” dinleme seçeneğini aç. Mikrofon yalnızca tarayıcı izninle ve bu sekme açıkken kullanılır.")
-        audio_message = st.audio_input("Hey Lidya, konuşmak için kaydet")
-        if audio_message is not None:
-            audio_hash = hashlib.sha256(audio_message.getvalue()).hexdigest()
-            if audio_hash != st.session_state.last_voice_hash:
-                if client is None:
-                    st.error(ui["no_key"])
-                else:
-                    try:
-                        with st.spinner("Lidya sesini yazıya dönüştürüyor…"):
-                            spoken_text = transcribe_audio(audio_message)
-                        st.session_state.last_voice_hash = audio_hash
-                        spoken_text = str(spoken_text).strip()
-                        if spoken_text:
-                            active_messages = get_messages(selected_module)
-                            history = list(active_messages)
-                            api_messages = [{"role":"system","content":build_system_instruction(selected_module,language)}]
-                            for item in history[-8:]:
-                                if item.get("role") in ("user","assistant"):
-                                    api_messages.append({"role":item["role"],"content":item["content"][:9000]})
-                            api_messages.append({"role":"user","content":spoken_text})
-                            active_messages.append({"role":"user","content":spoken_text,"time":turkish_time()})
-                            with st.spinner(ui["thinking"]):
-                                result = client.chat.completions.create(model=MODEL_NAME,messages=api_messages,temperature=.4,max_completion_tokens=2200)
-                            voice_answer = result.choices[0].message.content or ""
-                            if voice_answer:
-                                active_messages.append({"role":"assistant","content":voice_answer,"time":turkish_time()})
-                                st.session_state.last_answer = voice_answer
-                                st.rerun()
-                        else:
-                            st.warning("Konuşma algılanamadı; tekrar kaydetmeyi dene.")
-                    except Exception as exc:
-                        st.error(f"Sesli giriş başarısız: {type(exc).__name__}: {exc}")
-
-if selected_module in MODULES and selected_module not in ("🎬 Video Studio",):
-    uploaded_chat = st.chat_input(
-        ui["chat"],
-        accept_file="multiple",
-        file_type=["pdf","docx","txt","md","csv","json","py","png","jpg","jpeg","webp"],
-    )
-    if uploaded_chat:
-        prompt_text = (uploaded_chat.text or "").strip()
-        extracted = []
-        names = []
-        for file in uploaded_chat.files:
-            names.append(file.name)
-            extracted.append(f"\n\n[Dosya: {file.name}]\n{extract_file(file)}")
-        full_prompt = prompt_text + ("\n\nEkli dosyaların içeriği:\n" + "\n".join(extracted) if extracted else "")
-        web_context = ""
-        web_results = []
-        if web_search_enabled and prompt_text.strip():
-            with st.spinner("Canlı web sonuçları aranıyor…"):
-                web_results, search_error = search_web(prompt_text, max_results=5)
-            if web_results:
-                web_context = "\n\nLIVE WEB SEARCH RESULTS (treat as sources to assess, not guaranteed truth):\n" + "\n".join(
-                    f"{i+1}. {item['title']}\nURL: {item['url']}\nSnippet: {item['body']}" for i, item in enumerate(web_results)
-                )
-                full_prompt += web_context
-            elif search_error:
-                st.warning("Canlı arama şu anda çalışmadı; yanıt web kaynakları olmadan hazırlanacak.")
-        if not full_prompt.strip():
-            st.warning("Bir mesaj yaz veya dosya ekle.")
-        elif client is None:
-            st.error(ui["no_key"])
-        else:
-            messages = get_messages(selected_module)
-            history = list(messages)
-            user_display = prompt_text or "Ekli dosyayı incele."
-            if names: user_display += "\n\n📎 " + ", ".join(names)
-            messages.append({"role":"user","content":user_display,"time":turkish_time()})
-            api_messages=[{"role":"system","content":build_system_instruction(selected_module,language)}]
-            for item in history[-8:]:
-                if item.get("role") in ("user","assistant"):
-                    api_messages.append({"role":item["role"],"content":item["content"][:9000]})
-            api_messages.append({"role":"user","content":full_prompt[:18000]})
-            try:
-                with st.spinner(ui["thinking"]):
-                    completion=client.chat.completions.create(model=MODEL_NAME,messages=api_messages,temperature=.4,max_completion_tokens=2200)
-                answer=completion.choices[0].message.content
-                if not answer: raise RuntimeError("Model boş yanıt döndürdü.")
-                if has_red_flag(prompt_text):
-                    answer = "🚨 **Hayati risk varsa beklemeden 112'yi ara.**\n\n" + answer
-                messages.append({"role":"assistant","content":answer,"time":turkish_time()})
-                st.session_state.last_answer=answer
-                if web_results:
-                    st.session_state.last_web_sources = web_results
-                st.rerun()
-            except Exception as exc:
-                st.error(ui["error"])
-                st.caption(f"{type(exc).__name__}: {exc}")
-
-# ======================================================
-# 10b. IMAGE STUDIO PROMPT GENERATOR
-# ======================================================
-if selected_module == "🎨 Image Studio":
-    with st.form("image_prompt_form"):
-        idea=st.text_area("Görsel fikri",placeholder="Konu, kompozisyon, ortam, ışık ve stil…",height=100)
-        image_style=st.selectbox("Tarz",["Bilimsel illüstrasyon","Fotogerçekçi","Dijital sanat","Editoryal","3D render","Minimalist"])
-        image_ratio=st.selectbox("Oran",["1:1","4:5","16:9","9:16"])
-        gen_image_prompt=st.form_submit_button("Görsel üretim promptunu hazırla",use_container_width=True)
-    if gen_image_prompt:
-        if not idea.strip(): st.warning("Görsel fikrini yaz.")
-        elif client is None: st.error(ui["no_key"])
-        else:
-            try:
-                response=client.chat.completions.create(model=MODEL_NAME,messages=[{"role":"system","content":"You are an expert visual art director and prompt engineer. Output a detailed English image prompt and a negative prompt. Do not claim to render an image."},{"role":"user","content":f"Create a polished image-generation prompt for: {idea}. Style: {image_style}. Aspect ratio: {image_ratio}. Include composition, lighting, materials, camera/view, detail and a negative prompt."}],temperature=.7,max_completion_tokens=1000)
-                st.markdown(response.choices[0].message.content or "")
-            except Exception as exc: st.error(f"Prompt hazırlanamadı: {type(exc).__name__}")
-
-# ======================================================
-# 11. TEXT-TO-SPEECH
-# ======================================================
-voice_output = st.session_state.get("voice_output", False)
-if voice_output and st.session_state.last_answer:
-    speech_language = SPEECH_LANGS[language]
-    safe_text = json.dumps(st.session_state.last_answer, ensure_ascii=False)
-    tts_script = """<script>
-    const text = __TEXT__;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "__LANG__";
-    u.rate = __RATE__;
-    u.pitch = __PITCH__;
-    function speak() {
-      const voices = window.speechSynthesis.getVoices();
-      const v = voices.find(x => x.lang.startsWith("__LANG2__"));
-      if (v) { u.voice = v; }
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    }
-    if (window.speechSynthesis.getVoices().length) { speak(); }
-    else { window.speechSynthesis.onvoiceschanged = speak; }
-    </script>"""
-    tts_script = (tts_script
-                  .replace("__TEXT__", safe_text)
-                  .replace("__LANG2__", speech_language[:2])
-                  .replace("__LANG__", speech_language)
-                  .replace("__RATE__", str(float(st.session_state.get("voice_rate", 1.0))))
-                  .replace("__PITCH__", str(float(st.session_state.get("voice_pitch", 1.0)))))
-    components.html(tts_script, height=0)
-
-for _k in PERSIST_KEYS:
-    if _k in st.session_state:
-        _saved_settings[_k] = st.session_state[_k]
-
-# ======================================================
-# 12. FOOTER
-# ======================================================
-footer_html = '<div style="text-align:center;color:#b9a9dc;padding:30px 0 10px;font-size:13px;">Lidya AI - '
+                    generated.append(generate_imag
